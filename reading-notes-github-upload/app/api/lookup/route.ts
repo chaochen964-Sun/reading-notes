@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { env } from "cloudflare:workers";
+import { db, isDatabaseConfigured } from "@/db";
 
 type JsonValue = Record<string, unknown>;
 type GoogleVolume = {
@@ -377,8 +377,8 @@ const verifiedChineseEditions: Record<string, ChApiResult> = {
   },
 };
 
-function readEnvMap() {
-  return env as unknown as Record<string, string | undefined>;
+function readEnvMap(): Record<string, string | undefined> {
+  return process.env;
 }
 
 function pickText(value: unknown): string {
@@ -637,8 +637,8 @@ export async function GET(request: NextRequest) {
   if (isbn.length < 10) return NextResponse.json({ error: "请输入有效的 ISBN" }, { status: 400 });
 
   try {
-    if (env.DB) {
-      const saved = await env.DB
+    if (isDatabaseConfigured()) {
+      const saved = await db
         .prepare("SELECT isbn,title,authors,publisher,published_date,cover_url,podcast_url,chapters_json FROM books WHERE isbn=?")
         .bind(isbn)
         .first<{ isbn: string; title: string; authors: string; publisher: string; published_date: string; cover_url: string; podcast_url: string; chapters_json: string }>();

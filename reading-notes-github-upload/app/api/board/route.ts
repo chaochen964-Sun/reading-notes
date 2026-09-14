@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { env } from "cloudflare:workers";
+import { db, isDatabaseConfigured } from "@/db";
 
 type BookInput = { isbn: string; title: string; authors?: string; publisher?: string; publishedDate?: string; coverUrl?: string; podcastUrl?: string; chapters?: string[] };
 type CycleRecord = { id: string; title: string; eyebrow: string; is_active: number; selected_book_id: string | null; created_at: number };
@@ -90,49 +90,16 @@ function catalogLabel(index: number) {
   return `第 ${String(index + 1).padStart(2, "0")} 期`;
 }
 
-async function runIgnoringExisting(statement: string) {
-  try {
-    await env.DB!.prepare(statement).run();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!message.includes("already exists") && !message.includes("duplicate column")) throw error;
-  }
-}
-
-async function ensureSchema() {
-  await env.DB!.prepare("CREATE TABLE IF NOT EXISTS books (id text PRIMARY KEY NOT NULL,isbn text NOT NULL,title text NOT NULL,authors text DEFAULT '' NOT NULL,publisher text DEFAULT '' NOT NULL,published_date text DEFAULT '' NOT NULL,cover_url text DEFAULT '' NOT NULL,podcast_url text DEFAULT '' NOT NULL,chapters_json text DEFAULT '[]' NOT NULL,created_at integer NOT NULL)").run();
-  await runIgnoringExisting("CREATE UNIQUE INDEX books_isbn_unique ON books (isbn)");
-  await runIgnoringExisting("ALTER TABLE books ADD COLUMN podcast_url text DEFAULT '' NOT NULL");
-
-  await env.DB!.prepare("CREATE TABLE IF NOT EXISTS cycles (id text PRIMARY KEY NOT NULL,eyebrow text DEFAULT '本期共读' NOT NULL,title text NOT NULL,selected_book_id text,summary text DEFAULT '' NOT NULL,is_active integer DEFAULT true NOT NULL,created_at integer NOT NULL)").run();
-
-  await env.DB!.prepare("CREATE TABLE IF NOT EXISTS nominees (id text PRIMARY KEY NOT NULL,cycle_id text NOT NULL,book_id text NOT NULL,note text DEFAULT '' NOT NULL,created_at integer NOT NULL)").run();
-  await runIgnoringExisting("CREATE INDEX nominees_cycle_idx ON nominees (cycle_id)");
-
-  await env.DB!.prepare("CREATE TABLE IF NOT EXISTS suppressed_nominees (id text PRIMARY KEY NOT NULL,cycle_id text NOT NULL,book_id text NOT NULL,created_at integer NOT NULL)").run();
-  await runIgnoringExisting("CREATE UNIQUE INDEX suppressed_nominees_cycle_book_unique ON suppressed_nominees (cycle_id,book_id)");
-
-  await env.DB!.prepare("CREATE TABLE IF NOT EXISTS library_entries (id text PRIMARY KEY NOT NULL,device_id text NOT NULL,display_name text NOT NULL,avatar text NOT NULL,book_id text NOT NULL,status text DEFAULT 'reading' NOT NULL,progress integer DEFAULT 0 NOT NULL,current_chapter text DEFAULT '' NOT NULL,reflection text DEFAULT '' NOT NULL,updated_at integer NOT NULL)").run();
-  await runIgnoringExisting("CREATE UNIQUE INDEX library_device_book_unique ON library_entries (device_id,book_id)");
-  await runIgnoringExisting("CREATE INDEX library_device_idx ON library_entries (device_id)");
-
-  await env.DB!.prepare("CREATE TABLE IF NOT EXISTS personal_notes (id text PRIMARY KEY NOT NULL,device_id text NOT NULL,display_name text NOT NULL,avatar text NOT NULL,book_id text NOT NULL,chapter text DEFAULT '' NOT NULL,quote text DEFAULT '' NOT NULL,body text NOT NULL,created_at integer NOT NULL)").run();
-  await runIgnoringExisting("CREATE INDEX personal_notes_device_book_idx ON personal_notes (device_id,book_id)");
-
-  await env.DB!.prepare("CREATE TABLE IF NOT EXISTS group_notes (id text PRIMARY KEY NOT NULL,cycle_id text NOT NULL,book_id text NOT NULL,device_id text NOT NULL,display_name text NOT NULL,avatar text NOT NULL,chapter text DEFAULT '' NOT NULL,quote text DEFAULT '' NOT NULL,body text NOT NULL,created_at integer NOT NULL)").run();
-  await runIgnoringExisting("CREATE INDEX group_notes_cycle_book_idx ON group_notes (cycle_id,book_id)");
-}
-
 async function upsertBook(book: BookInput, options: { preserveExisting?: boolean } = {}) {
   const rawIsbn = book.isbn.trim();
   const cleanIsbn = rawIsbn.startsWith("manual-") ? rawIsbn : rawIsbn.replace(/[^0-9Xx]/g, "") || `manual-${id()}`;
-  const existing = await env.DB!.prepare("SELECT id FROM books WHERE isbn=?").bind(cleanIsbn).first<{ id: string }>();
+  const existing = await db.prepare("SELECT id FROM books WHERE isbn=?").bind(cleanIsbn).first<{ id: string }>();
   const bookId = existing?.id || id();
   const updateClause = options.preserveExisting
     ? "title=excluded.title,authors=CASE WHEN books.authors='' THEN excluded.authors ELSE books.authors END,publisher=CASE WHEN books.publisher='' THEN excluded.publisher ELSE books.publisher END,published_date=CASE WHEN books.published_date='' THEN excluded.published_date ELSE books.published_date END,cover_url=CASE WHEN books.cover_url='' THEN excluded.cover_url ELSE books.cover_url END,podcast_url=CASE WHEN books.podcast_url='' THEN excluded.podcast_url ELSE books.podcast_url END,chapters_json=CASE WHEN books.chapters_json='' OR books.chapters_json='[]' THEN excluded.chapters_json ELSE books.chapters_json END"
     : "title=excluded.title,authors=excluded.authors,publisher=excluded.publisher,published_date=excluded.published_date,cover_url=excluded.cover_url,podcast_url=excluded.podcast_url,chapters_json=excluded.chapters_json";
 
-  await env.DB!
+  await db
     .prepare(`INSERT INTO books (id,isbn,title,authors,publisher,published_date,cover_url,podcast_url,chapters_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(isbn) DO UPDATE SET ${updateClause}`)
     .bind(bookId, cleanIsbn, book.title, book.authors || "", book.publisher || "", book.publishedDate || "", book.coverUrl || "", book.podcastUrl || "", JSON.stringify(book.chapters || []), now())
     .run();
@@ -142,30 +109,30 @@ async function upsertBook(book: BookInput, options: { preserveExisting?: boolean
 
 async function setCycleNominee(cycleId: string, bookId: string, title: string, note?: string) {
   const displayNote = note ?? `${title}（往期推荐）`;
-  const suppressed = await env.DB!
+  const suppressed = await db
     .prepare("SELECT id FROM suppressed_nominees WHERE cycle_id=? AND book_id=? LIMIT 1")
     .bind(cycleId, bookId)
     .first<{ id: string }>();
   if (suppressed?.id) return;
 
-  const existingNominee = await env.DB!
+  const existingNominee = await db
     .prepare("SELECT id FROM nominees WHERE cycle_id=? AND book_id=? LIMIT 1")
     .bind(cycleId, bookId)
     .first<{ id: string }>();
 
   if (existingNominee?.id) {
-    if (note !== undefined) await env.DB!.prepare("UPDATE nominees SET note=? WHERE id=?").bind(displayNote, existingNominee.id).run();
+    if (note !== undefined) await db.prepare("UPDATE nominees SET note=? WHERE id=?").bind(displayNote, existingNominee.id).run();
     return;
   }
 
-  await env.DB!
+  await db
     .prepare("INSERT INTO nominees (id,cycle_id,book_id,note,created_at) VALUES (?,?,?,?,?)")
     .bind(id(), cycleId, bookId, displayNote, now())
     .run();
 }
 
 async function seedFullCatalogIfNeeded() {
-  const existing = await env.DB!.prepare("SELECT id,title,eyebrow,is_active,selected_book_id,created_at FROM cycles").all<CycleRecord>();
+  const existing = await db.prepare("SELECT id,title,eyebrow,is_active,selected_book_id,created_at FROM cycles").all<CycleRecord>();
   const rows = existing.results;
 
   const rowsByEyebrow = new Map(rows.map((c) => [c.eyebrow.trim(), c] as const));
@@ -181,17 +148,17 @@ async function seedFullCatalogIfNeeded() {
     const previousTitle = previousCycleTitles[i] || title;
     const eyebrow = catalogLabel(i);
     const bookId = await upsertBook({ authors: "", publishedDate: "", coverUrl: "", podcastUrl: "", chapters: [], ...book }, { preserveExisting: true });
-    const oldManualBook = await env.DB!.prepare("SELECT id FROM books WHERE isbn=?").bind(`manual-cycle-${i + 1}`).first<{ id: string }>();
+    const oldManualBook = await db.prepare("SELECT id FROM books WHERE isbn=?").bind(`manual-cycle-${i + 1}`).first<{ id: string }>();
     const existingCycle = rowsByEyebrow.get(eyebrow) || rowsByTitle.get(title) || reusableLegacyRow;
     reusableLegacyRow = null;
 
     if (existingCycle) {
-      await env.DB!
+      await db
         .prepare("UPDATE cycles SET eyebrow=?, title=CASE WHEN title='' OR title=? OR title=? THEN ? ELSE title END, selected_book_id=CASE WHEN selected_book_id IS NULL OR selected_book_id=? THEN ? ELSE selected_book_id END, is_active=? WHERE id=?")
         .bind(eyebrow, `manual-cycle-${i + 1}`, previousTitle, title, oldManualBook?.id || "", bookId, i === cycleCatalog.length - 1 ? 1 : 0, existingCycle.id)
         .run();
       if (i < cycleCatalog.length - 1) await setCycleNominee(existingCycle.id, bookId, title, book.publisher || `${title}（往期推荐）`);
-      if (oldManualBook?.id && oldManualBook.id !== bookId) await env.DB!.prepare("DELETE FROM nominees WHERE cycle_id=? AND book_id=?").bind(existingCycle.id, oldManualBook.id).run();
+      if (oldManualBook?.id && oldManualBook.id !== bookId) await db.prepare("DELETE FROM nominees WHERE cycle_id=? AND book_id=?").bind(existingCycle.id, oldManualBook.id).run();
       if (i === cycleCatalog.length - 1) {
         currentCycleId = existingCycle.id;
         currentFallbackBookId = oldManualBook?.id || "";
@@ -200,7 +167,7 @@ async function seedFullCatalogIfNeeded() {
     }
 
     const cycleId = id();
-    await env.DB!
+    await db
       .prepare("INSERT INTO cycles (id, eyebrow, title, selected_book_id, summary, is_active, created_at) VALUES (?, ?, ?, ?, '', ?, ?)")
       .bind(cycleId, eyebrow, title, bookId, i === cycleCatalog.length - 1 ? 1 : 0, now())
       .run();
@@ -219,60 +186,58 @@ async function seedFullCatalogIfNeeded() {
       if (book.isbn === "9787111555377") selectedBookId = bookId;
     }
 
-    const selected = await env.DB!
+    const selected = await db
       .prepare("SELECT selected_book_id FROM cycles WHERE id=?")
       .bind(currentCycleId)
       .first<{ selected_book_id: string | null }>();
 
     if (selectedBookId && (!selected?.selected_book_id || selected.selected_book_id === currentFallbackBookId)) {
-      await env.DB!.prepare("UPDATE cycles SET selected_book_id=? WHERE id=?").bind(selectedBookId, currentCycleId).run();
+      await db.prepare("UPDATE cycles SET selected_book_id=? WHERE id=?").bind(selectedBookId, currentCycleId).run();
     }
 
     if (currentFallbackBookId) {
-      await env.DB!.prepare("DELETE FROM nominees WHERE cycle_id=? AND book_id=?").bind(currentCycleId, currentFallbackBookId).run();
+      await db.prepare("DELETE FROM nominees WHERE cycle_id=? AND book_id=?").bind(currentCycleId, currentFallbackBookId).run();
     }
   }
 
   // 把第 31 期设成当前期；用户之后仍可编辑这一期标题。
-  const latestRow = await env.DB!.prepare("SELECT id FROM cycles WHERE eyebrow=?").bind(catalogLabel(cycleCatalog.length - 1)).first<{ id: string }>();
+  const latestRow = await db.prepare("SELECT id FROM cycles WHERE eyebrow=?").bind(catalogLabel(cycleCatalog.length - 1)).first<{ id: string }>();
   if (latestRow?.id) {
-    await env.DB!.prepare("UPDATE cycles SET is_active=0").run();
-    await env.DB!.prepare("UPDATE cycles SET is_active=1 WHERE id=?").bind(latestRow.id).run();
+    await db.prepare("UPDATE cycles SET is_active=0").run();
+    await db.prepare("UPDATE cycles SET is_active=1 WHERE id=?").bind(latestRow.id).run();
   }
 }
 
 export async function GET(request: NextRequest) {
-  if (!env.DB) return NextResponse.json({ error: "数据库尚未连接" }, { status: 503 });
+  if (!isDatabaseConfigured()) return NextResponse.json({ error: "数据库尚未连接" }, { status: 503 });
 
-  await ensureSchema();
   await seedFullCatalogIfNeeded();
 
   const deviceId = request.nextUrl.searchParams.get("deviceId") || "";
   const [books, library, notes, cycles, nominees, groupNotes] = await Promise.all([
-    env.DB.prepare("SELECT * FROM books ORDER BY created_at DESC").all(),
-    env.DB.prepare("SELECT l.*, b.title, b.authors, b.isbn, b.cover_url, b.podcast_url, b.chapters_json FROM library_entries l JOIN books b ON b.id=l.book_id WHERE l.device_id=? ORDER BY l.updated_at DESC").bind(deviceId).all(),
-    env.DB.prepare("SELECT n.*, b.title FROM personal_notes n JOIN books b ON b.id=n.book_id WHERE n.device_id=? ORDER BY n.created_at DESC").bind(deviceId).all(),
-    env.DB.prepare("SELECT c.*, b.title AS selected_title, b.authors AS selected_authors, b.cover_url AS selected_cover, b.podcast_url AS selected_podcast, b.isbn AS selected_isbn, b.chapters_json AS selected_chapters FROM cycles c LEFT JOIN books b ON b.id=c.selected_book_id ORDER BY c.created_at DESC").all(),
-    env.DB.prepare("SELECT n.*, b.title, b.authors, b.cover_url, b.podcast_url, b.published_date, b.isbn, b.chapters_json FROM nominees n JOIN books b ON b.id=n.book_id ORDER BY n.created_at DESC").all(),
-    env.DB.prepare("SELECT g.*, b.title FROM group_notes g JOIN books b ON b.id=g.book_id ORDER BY g.created_at DESC").all(),
+    db.prepare("SELECT * FROM books ORDER BY created_at DESC").all(),
+    db.prepare("SELECT l.*, b.title, b.authors, b.isbn, b.cover_url, b.podcast_url, b.chapters_json FROM library_entries l JOIN books b ON b.id=l.book_id WHERE l.device_id=? ORDER BY l.updated_at DESC").bind(deviceId).all(),
+    db.prepare("SELECT n.*, b.title FROM personal_notes n JOIN books b ON b.id=n.book_id WHERE n.device_id=? ORDER BY n.created_at DESC").bind(deviceId).all(),
+    db.prepare("SELECT c.*, b.title AS selected_title, b.authors AS selected_authors, b.cover_url AS selected_cover, b.podcast_url AS selected_podcast, b.isbn AS selected_isbn, b.chapters_json AS selected_chapters FROM cycles c LEFT JOIN books b ON b.id=c.selected_book_id ORDER BY c.created_at DESC").all(),
+    db.prepare("SELECT n.*, b.title, b.authors, b.cover_url, b.podcast_url, b.published_date, b.isbn, b.chapters_json FROM nominees n JOIN books b ON b.id=n.book_id ORDER BY n.created_at DESC").all(),
+    db.prepare("SELECT g.*, b.title FROM group_notes g JOIN books b ON b.id=g.book_id ORDER BY g.created_at DESC").all(),
   ]);
 
   return NextResponse.json({ books: books.results, library: library.results, notes: notes.results, cycles: cycles.results, nominees: nominees.results, groupNotes: groupNotes.results });
 }
 
 export async function POST(request: NextRequest) {
-  if (!env.DB) return NextResponse.json({ error: "数据库尚未连接" }, { status: 503 });
-  await ensureSchema();
+  if (!isDatabaseConfigured()) return NextResponse.json({ error: "数据库尚未连接" }, { status: 503 });
   const data = await request.json() as Record<string, any>;
 
   try {
     if (data.action === "saveLibrary") {
       const bookId = await upsertBook(data.book);
-      const existing = await env.DB
+      const existing = await db
         .prepare("SELECT id FROM library_entries WHERE device_id=? AND book_id=?")
         .bind(data.profile.deviceId, bookId)
         .first<{ id: string }>();
-      await env.DB
+      await db
         .prepare(
           "INSERT INTO library_entries (id,device_id,display_name,avatar,book_id,status,progress,current_chapter,reflection,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(device_id,book_id) DO UPDATE SET display_name=excluded.display_name,avatar=excluded.avatar,status=excluded.status,progress=excluded.progress,current_chapter=excluded.current_chapter,reflection=excluded.reflection,updated_at=excluded.updated_at",
         )
@@ -290,14 +255,14 @@ export async function POST(request: NextRequest) {
         )
         .run();
     } else if (data.action === "personalNote") {
-      await env.DB
+      await db
         .prepare(
           "INSERT INTO personal_notes (id,device_id,display_name,avatar,book_id,chapter,quote,body,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
         )
         .bind(id(), data.profile.deviceId, data.profile.name, data.profile.avatar, data.bookId, data.chapter || "", data.quote || "", data.body, now())
         .run();
     } else if (data.action === "groupNote") {
-      await env.DB
+      await db
         .prepare(
           "INSERT INTO group_notes (id,cycle_id,book_id,device_id,display_name,avatar,chapter,quote,body,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
         )
@@ -305,63 +270,63 @@ export async function POST(request: NextRequest) {
         .run();
     } else if (data.action === "nominate") {
       const bookId = await upsertBook(data.book);
-      await env.DB
+      await db
         .prepare("INSERT INTO nominees (id,cycle_id,book_id,note,created_at) VALUES (?,?,?,?,?)")
         .bind(id(), data.cycleId, bookId, data.note || "", now())
         .run();
-      if (data.select) await env.DB.prepare("UPDATE cycles SET selected_book_id=? WHERE id=?").bind(bookId, data.cycleId).run();
+      if (data.select) await db.prepare("UPDATE cycles SET selected_book_id=? WHERE id=?").bind(bookId, data.cycleId).run();
     } else if (data.action === "updateNominee") {
-      const nominee = await env.DB
+      const nominee = await db
         .prepare("SELECT book_id FROM nominees WHERE id=? AND cycle_id=?")
         .bind(data.nomineeId, data.cycleId)
         .first<{ book_id: string }>();
       if (!nominee) return NextResponse.json({ error: "未找到目标推选书目" }, { status: 404 });
 
       const bookId = await upsertBook(data.book);
-      const selectedBook = await env.DB
+      const selectedBook = await db
         .prepare("SELECT selected_book_id FROM cycles WHERE id=?")
         .bind(data.cycleId)
         .first<{ selected_book_id: string | null }>();
 
-      await env.DB
+      await db
         .prepare("UPDATE nominees SET book_id=?, note=? WHERE id=? AND cycle_id=?")
         .bind(bookId, data.note || "", data.nomineeId, data.cycleId)
         .run();
 
       if (data.select || nominee.book_id === selectedBook?.selected_book_id) {
-        await env.DB.prepare("UPDATE cycles SET selected_book_id=? WHERE id=?").bind(bookId, data.cycleId).run();
+        await db.prepare("UPDATE cycles SET selected_book_id=? WHERE id=?").bind(bookId, data.cycleId).run();
       }
     } else if (data.action === "deleteNominee") {
-      const nominee = await env.DB
+      const nominee = await db
         .prepare("SELECT book_id FROM nominees WHERE id=? AND cycle_id=?")
         .bind(data.nomineeId, data.cycleId)
         .first<{ book_id: string }>();
       if (!nominee) return NextResponse.json({ error: "未找到目标推选书目" }, { status: 404 });
 
-      await env.DB.prepare("INSERT INTO suppressed_nominees (id,cycle_id,book_id,created_at) VALUES (?,?,?,?) ON CONFLICT(cycle_id,book_id) DO NOTHING").bind(id(), data.cycleId, nominee.book_id, now()).run();
-      await env.DB.prepare("DELETE FROM nominees WHERE id=? AND cycle_id=?").bind(data.nomineeId, data.cycleId).run();
-      await env.DB
+      await db.prepare("INSERT INTO suppressed_nominees (id,cycle_id,book_id,created_at) VALUES (?,?,?,?) ON CONFLICT(cycle_id,book_id) DO NOTHING").bind(id(), data.cycleId, nominee.book_id, now()).run();
+      await db.prepare("DELETE FROM nominees WHERE id=? AND cycle_id=?").bind(data.nomineeId, data.cycleId).run();
+      await db
         .prepare("UPDATE cycles SET selected_book_id = CASE WHEN selected_book_id = ? THEN NULL ELSE selected_book_id END WHERE id=?")
         .bind(nominee.book_id, data.cycleId)
         .run();
     } else if (data.action === "setCycleSelection") {
-      const nominee = await env.DB
+      const nominee = await db
         .prepare("SELECT book_id FROM nominees WHERE id=? AND cycle_id=?")
         .bind(data.nomineeId, data.cycleId)
         .first<{ book_id: string }>();
       if (!nominee) return NextResponse.json({ error: "未找到目标推选书目" }, { status: 404 });
 
-      await env.DB.prepare("UPDATE cycles SET selected_book_id=? WHERE id=?").bind(nominee.book_id, data.cycleId).run();
+      await db.prepare("UPDATE cycles SET selected_book_id=? WHERE id=?").bind(nominee.book_id, data.cycleId).run();
     } else if (data.action === "updateCycle") {
-      await env.DB
+      await db
         .prepare("UPDATE cycles SET eyebrow=?, title=? WHERE id=?")
         .bind(data.eyebrow || "本期共读", data.title || "未命名期次", data.cycleId)
         .run();
     } else if (data.action === "summary") {
-      await env.DB.prepare("UPDATE cycles SET summary=? WHERE id=?").bind(data.summary || "", data.cycleId).run();
+      await db.prepare("UPDATE cycles SET summary=? WHERE id=?").bind(data.summary || "", data.cycleId).run();
     } else if (data.action === "newCycle") {
-      await env.DB.prepare("UPDATE cycles SET is_active=0").run();
-      await env.DB
+      await db.prepare("UPDATE cycles SET is_active=0").run();
+      await db
         .prepare("INSERT INTO cycles (id,eyebrow,title,selected_book_id,summary,is_active,created_at) VALUES (?,?,?,NULL,'',1,?)")
         .bind(id(), data.eyebrow || "新一期共读", data.title, now())
         .run();

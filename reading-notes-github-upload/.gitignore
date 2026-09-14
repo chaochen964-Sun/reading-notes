@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+
+# Next.js build output
+.next
+out
+
+# Generated for AI agents by `next dev` / `next build`
+AGENTS.md
+CLAUDE.md
+
+# Local Netlify folder
+.netlify
+
+# pnpm policy cache written by the local runtime
+.sites-runtime
+
+# Environment
+.env
+.env*.local
+
+# Deno lockfile written by `netlify dev`
+deno.lock
+
+# Misc
+*.tsbuildinfo
+.DS_Store
