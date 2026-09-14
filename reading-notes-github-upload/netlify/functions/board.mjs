@@ -1,4 +1,4 @@
-import { getStore } from "@netlify/blobs";
+import { connectLambda, getStore } from "@netlify/blobs";
 
 const key = "public-board";
 const now = () => Date.now();
@@ -278,8 +278,35 @@ async function handlePost(req) {
   return json({ ok: true });
 }
 
-export default async function handler(req) {
+async function handleRequest(req) {
   if (req.method === "GET") return json(await loadBoard());
   if (req.method === "POST") return handlePost(req);
   return json({ error: "Method not allowed" }, 405);
+}
+
+export async function handler(event) {
+  connectLambda(event);
+  const body = event.body && event.httpMethod !== "GET"
+    ? event.isBase64Encoded ? Buffer.from(event.body, "base64") : event.body
+    : undefined;
+  const req = new Request(`https://readingnotes.local` + (event.rawUrl || event.path || "/api/board"), {
+    method: event.httpMethod,
+    headers: event.headers || {},
+    body,
+  });
+
+  try {
+    const response = await handleRequest(req);
+    return {
+      statusCode: response.status,
+      headers: Object.fromEntries(response.headers),
+      body: await response.text(),
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ error: error instanceof Error ? error.message : "保存服务暂时不可用" }),
+    };
+  }
 }

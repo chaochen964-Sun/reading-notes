@@ -357,10 +357,7 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    if (applyFallbackAction(payload)) {
-      setLoading(false);
-      return true;
-    }
+    const shouldFallback = String(payload.cycleId || "").startsWith("fallback-") || String(payload.nomineeId || "").startsWith("fallback-");
 
     const res = await fetch("/api/board", {
       method: "POST",
@@ -371,6 +368,10 @@ export default function Home() {
     const data = (await res.json()) as { error?: string };
     setLoading(false);
     if (!res.ok) {
+      if (shouldFallback && applyFallbackAction(payload)) {
+        setLoading(false);
+        return true;
+      }
       setMessage(data.error || "保存失败");
       return false;
     }
