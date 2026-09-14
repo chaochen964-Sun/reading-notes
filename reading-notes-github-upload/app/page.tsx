@@ -224,9 +224,9 @@ export default function Home() {
 
   async function refresh(deviceId = profile?.deviceId || "") {
     const res = await fetch(`/api/board?deviceId=${encodeURIComponent(deviceId)}`, { cache: "no-store" });
-    const data = await res.json().catch(() => ({}));
+    const data = (await res.json().catch(() => ({}))) as Partial<Board> & { error?: string };
     if (res.ok && data.cycles?.length) {
-      setBoard(data);
+      setBoard(data as Board);
       setBoardError("");
     } else {
       setBoard(fallbackBoard());
