@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The generated AGENTS.md / CLAUDE.md files are not tracked in this repo.
+  agentRules: false,
 };
 
 export default nextConfig;

@@ -12,13 +12,25 @@
 
 ## 当前数据模式
 
-这个仓库里的公开部署版优先保证“所有人打开都能看到书单”。如果后端数据库不可用，页面会自动显示内置公共书单，并把编辑结果保存在当前浏览器里。
+数据保存在 Netlify Database（托管 Postgres）里，所有成员共享同一份可编辑数据：
 
-这意味着：
+- `books`：书目
+- `cycles`：期次
+- `nominees`：每期推荐
+- `suppressed_nominees`：被删除的推荐
+- `library_entries`：个人书架
+- `personal_notes`：个人笔记
+- `group_notes`：共读笔记
 
-- 展示内容稳定，不会因为线上数据库空白而看不到共读内容。
-- 浏览器内修改可以保存到自己设备。
-- 如果需要所有成员共享同一份可编辑数据，后续建议接入 Supabase 或 Netlify Blobs。
+表结构定义在 `db/schema.ts`，迁移文件在 `netlify/database/migrations/`，部署时由 Netlify 自动执行。
+
+第 1–31 期书单会在数据库第一次为空时自动写入，所以新环境打开就能看到完整往期内容。如果数据库暂时不可用，页面仍会回退到内置公共书单，并把编辑结果保存在当前浏览器里。
+
+修改表结构后需要重新生成迁移：
+
+```bash
+pnpm db:generate -- --name <描述本次修改>
+```
 
 ## 本地开发
 
@@ -32,13 +44,13 @@ pnpm dev
 本地地址：
 
 ```text
-http://readingnotes.localhost:5173
+http://localhost:3000
 ```
 
-如果这个地址打不开，也可以用：
+如果需要连上 Netlify Database 和其他 Netlify 功能，用 Netlify CLI 启动：
 
-```text
-http://localhost:5173
+```bash
+netlify dev --port 8889
 ```
 
 ## 构建
@@ -58,19 +70,7 @@ readingnotes.netlify.app
 Netlify 设置：
 
 - Build command: `pnpm build`
-- Publish directory: `dist/client`
+- Publish directory: `.next`
 - Node version: `22`
 
-仓库已包含 `netlify.toml`，通常导入 GitHub 仓库后 Netlify 会自动读取。
-
-## 后续可升级
-
-如果要让所有读书会成员编辑同一份数据，建议下一步接 Supabase：
-
-- `cycles`：期次
-- `books`：书目
-- `nominees`：每期推荐
-- `group_notes`：共读笔记
-- `personal_notes`：个人笔记
-
-这样 Netlify 只负责托管网页，数据由 Supabase 提供，稳定性会比当前临时数据库方案更好。
+仓库已包含 `netlify.toml`，通常导入 GitHub 仓库后 Netlify 会自动读取。页面和 `app/api/*` 接口都由 Netlify 的 Next.js 运行时提供服务。
