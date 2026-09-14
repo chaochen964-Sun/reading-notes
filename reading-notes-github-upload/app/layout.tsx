@@ -4,9 +4,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "读记 · Reading Notes",
   description: "读记：个人阅读记录与读书会共读笔记",
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

@@ -1,0 +1,19 @@
+node_modules
+.next
+dist
+out
+
+# pnpm store metadata written by the original scaffold's installer
+.sites-runtime
+.wrangler
+
+.env
+.env.local
+.env*.local
+
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+deno.lock
+
+.netlify

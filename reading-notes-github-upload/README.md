@@ -5,20 +5,17 @@
 - 第 1–31 期往期书单展示
 - 第 31 期推荐阅读书单
 - 本期所选书目展示
-- 个人浏览器内的编辑、删除、设为本期和笔记记录
+- 编辑、删除、设为本期和共读笔记记录
 - 中文 ISBN 手动补录字段
 - 豆瓣封面图片转发显示
-- 分享二维码：`public/share/readingnotes-qr.png`
 
 ## 当前数据模式
 
-这个仓库里的公开部署版优先保证“所有人打开都能看到书单”。如果后端数据库不可用，页面会自动显示内置公共书单，并把编辑结果保存在当前浏览器里。
+书单、期次、推荐书目和共读笔记都存在 Netlify Database（托管 Postgres）里，所有成员看到并编辑的是同一份数据。
 
-这意味着：
-
-- 展示内容稳定，不会因为线上数据库空白而看不到共读内容。
-- 浏览器内修改可以保存到自己设备。
-- 如果需要所有成员共享同一份可编辑数据，后续建议接入 Supabase 或 Netlify Blobs。
+- 首次打开时，第 1–31 期的公共书单会自动写入数据库。
+- 「我的书架」和个人笔记按浏览器区分，只有本人可见；共读笔记所有人可见。
+- 如果数据库暂时连不上，页面会退回内置的公共书单，保证书单始终可读。
 
 ## 本地开发
 
@@ -26,51 +23,37 @@
 
 ```bash
 pnpm install
-pnpm dev
+netlify dev
 ```
 
-本地地址：
+`netlify dev` 会连上这个站点的数据库分支，本地地址：
 
 ```text
-http://readingnotes.localhost:5173
+http://localhost:8888
 ```
 
-如果这个地址打不开，也可以用：
+只跑前端（不连数据库）可以用 `pnpm dev`。
 
-```text
-http://localhost:5173
-```
+## 数据库结构改动
 
-## 构建
+表结构定义在 `db/schema.ts`。改完之后要生成迁移文件：
 
 ```bash
-pnpm build
+pnpm db:generate -- --name <改动说明>
 ```
+
+迁移文件会写到 `netlify/database/migrations/`，Netlify 在部署时自动执行，不需要手动跑。
 
 ## Netlify 部署
 
-推荐先用 Netlify 免费域名，例如：
+推送到 GitHub 后 Netlify 会自动构建部署。仓库里的 `netlify.toml` 已经配置好构建命令，Next.js 的服务端渲染和 `/api/*` 接口由 Netlify 自动处理。
 
-```text
-readingnotes.netlify.app
-```
+## 表结构
 
-Netlify 设置：
-
-- Build command: `pnpm build`
-- Publish directory: `dist/client`
-- Node version: `22`
-
-仓库已包含 `netlify.toml`，通常导入 GitHub 仓库后 Netlify 会自动读取。
-
-## 后续可升级
-
-如果要让所有读书会成员编辑同一份数据，建议下一步接 Supabase：
-
-- `cycles`：期次
 - `books`：书目
+- `cycles`：期次
 - `nominees`：每期推荐
+- `suppressed_nominees`：手动删掉的推荐（避免重新写入公共书单时复活）
 - `group_notes`：共读笔记
+- `library_entries`：个人书架
 - `personal_notes`：个人笔记
-
-这样 Netlify 只负责托管网页，数据由 Supabase 提供，稳定性会比当前临时数据库方案更好。

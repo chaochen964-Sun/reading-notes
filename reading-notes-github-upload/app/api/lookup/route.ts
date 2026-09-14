@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { env } from "cloudflare:workers";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { books } from "@/db/schema";
 
 type JsonValue = Record<string, unknown>;
 type GoogleVolume = {
@@ -378,7 +380,7 @@ const verifiedChineseEditions: Record<string, ChApiResult> = {
 };
 
 function readEnvMap() {
-  return env as unknown as Record<string, string | undefined>;
+  return process.env as Record<string, string | undefined>;
 }
 
 function pickText(value: unknown): string {
@@ -637,24 +639,40 @@ export async function GET(request: NextRequest) {
   if (isbn.length < 10) return NextResponse.json({ error: "请输入有效的 ISBN" }, { status: 400 });
 
   try {
-    if (env.DB) {
-      const saved = await env.DB
-        .prepare("SELECT isbn,title,authors,publisher,published_date,cover_url,podcast_url,chapters_json FROM books WHERE isbn=?")
-        .bind(isbn)
-        .first<{ isbn: string; title: string; authors: string; publisher: string; published_date: string; cover_url: string; podcast_url: string; chapters_json: string }>();
+    // A book someone has already catalogued wins over any external source, since the
+    // shared library carries the manual Chinese-edition corrections members made.
+    try {
+      const [saved] = await db
+        .select({
+          isbn: books.isbn,
+          title: books.title,
+          authors: books.authors,
+          publisher: books.publisher,
+          publishedDate: books.publishedDate,
+          coverUrl: books.coverUrl,
+          podcastUrl: books.podcastUrl,
+          chaptersJson: books.chaptersJson,
+        })
+        .from(books)
+        .where(eq(books.isbn, isbn))
+        .limit(1);
+
       if (saved) {
         return NextResponse.json({
           isbn: saved.isbn,
           title: saved.title,
           authors: saved.authors,
           publisher: saved.publisher,
-          publishedDate: saved.published_date,
-          coverUrl: saved.cover_url,
-          podcastUrl: saved.podcast_url,
-          chapters: JSON.parse(saved.chapters_json || "[]"),
+          publishedDate: saved.publishedDate,
+          coverUrl: saved.coverUrl,
+          podcastUrl: saved.podcastUrl,
+          chapters: JSON.parse(saved.chaptersJson || "[]"),
           catalogSource: "读记共享书目库",
         });
       }
+    } catch {
+      // The shared library is only a shortcut here — fall through to the external
+      // catalogues rather than failing the lookup when the database is unreachable.
     }
 
     const verified = verifiedChineseEditions[isbn];
