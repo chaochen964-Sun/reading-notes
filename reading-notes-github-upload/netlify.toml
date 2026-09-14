@@ -1,10 +1,15 @@
 [build]
-  command = "pnpm build"
-  publish = "dist/client"
+  command = "corepack enable && corepack prepare pnpm@11.25.0 --activate && pnpm install --frozen-lockfile && pnpm build"
+  publish = "out"
 
 [build.environment]
   NODE_VERSION = "22"
   PNPM_VERSION = "11.25.0"
+
+[[redirects]]
+  from = "/api/board"
+  to = "/.netlify/functions/board"
+  status = 200
 
 [[redirects]]
   from = "/*"
