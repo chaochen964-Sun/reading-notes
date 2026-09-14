@@ -1,5 +1,3 @@
-import { connectLambda, getStore } from "@netlify/blobs";
-
 const key = "public-board";
 const now = () => Date.now();
 const id = () => crypto.randomUUID();
@@ -134,23 +132,58 @@ function mergeSeedMetadata(board) {
 }
 
 async function loadBoard() {
-  const store = getStore("reading-notes");
-  const board = await store.get(key, { type: "json" });
+  const rows = await supabaseFetch(`reading_notes_state?key=eq.${encodeURIComponent(key)}&select=data&limit=1`);
+  const board = rows?.[0]?.data;
   if (board?.cycles?.length) {
-    if (mergeSeedMetadata(board)) await store.setJSON(key, board);
+    if (mergeSeedMetadata(board)) await saveBoard(board);
     return board;
   }
   const seeded = seedBoard();
-  await store.setJSON(key, seeded);
+  await saveBoard(seeded);
   return seeded;
 }
 
 async function saveBoard(board) {
-  await getStore("reading-notes").setJSON(key, board);
+  await supabaseFetch("reading_notes_state", {
+    method: "POST",
+    headers: { prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key, data: board }),
+  });
 }
 
 function json(body, status = 200) {
   return Response.json(body, { status });
+}
+
+function supabaseConfig() {
+  const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error("Supabase 还没有配置：请在 Netlify Environment variables 添加 SUPABASE_URL 和 SUPABASE_SERVICE_ROLE_KEY");
+  }
+  return { url, key };
+}
+
+async function supabaseFetch(path, options = {}) {
+  const config = supabaseConfig();
+  const response = await fetch(`${config.url}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: config.key,
+      authorization: `Bearer ${config.key}`,
+      "content-type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `Supabase request failed: ${response.status}`);
+  }
+
+  if (response.status === 204) return null;
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 function normalizeBook(input = {}) {
@@ -285,11 +318,13 @@ async function handleRequest(req) {
 }
 
 export async function handler(event) {
-  connectLambda(event);
   const body = event.body && event.httpMethod !== "GET"
     ? event.isBase64Encoded ? Buffer.from(event.body, "base64") : event.body
     : undefined;
-  const req = new Request(`https://readingnotes.local` + (event.rawUrl || event.path || "/api/board"), {
+  const requestUrl = event.rawUrl?.startsWith("http")
+    ? event.rawUrl
+    : `https://readingnotes.local${event.rawUrl || event.path || "/api/board"}`;
+  const req = new Request(requestUrl, {
     method: event.httpMethod,
     headers: event.headers || {},
     body,
