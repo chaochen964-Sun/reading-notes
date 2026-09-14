@@ -135,7 +135,7 @@ function mergeSeedMetadata(board) {
 
 async function loadBoard() {
   const store = getStore("reading-notes");
-  const board = await store.get(key, { type: "json", consistency: "strong" });
+  const board = await store.get(key, { type: "json" });
   if (board?.cycles?.length) {
     if (mergeSeedMetadata(board)) await store.setJSON(key, board);
     return board;
