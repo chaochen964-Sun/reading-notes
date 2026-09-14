@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789367432070,
+      "tag": "0000_curious_logan",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789380210758,
+      "tag": "0001_add_podcast_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789381494548,
+      "tag": "0002_suppressed_nominees",
+      "breakpoints": true
+    }
+  ]
+}

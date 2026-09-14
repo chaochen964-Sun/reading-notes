@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="160" viewBox="0 0 660 160">
+  <rect x="0" y="16" width="128" height="128" rx="28" fill="#14224a"/>
+  <path d="M31 49c17-9 35-13 55-13 8 0 14 6 14 14v68c0 9-10 15-18 10L56 111l-29 22c-8 6-19 0-19-9V78c0-13 9-24 23-29Z" fill="#f8fbff"/>
+  <path d="M71 48c15-8 32-12 50-12 18 0 32 14 32 32v57c0 10-11 15-19 9l-29-23-27 18c-8 5-18 0-18-10V67c0-8 4-15 11-19Z" fill="#78e0c6"/>
+  <path d="M42 77c12-5 26-8 41-8" fill="none" stroke="#254cda" stroke-width="10" stroke-linecap="round"/>
+  <path d="M88 77c12-5 25-7 39-7" fill="none" stroke="#14224a" stroke-width="10" stroke-linecap="round"/>
+  <text x="174" y="101" fill="#15274b" font-family="Songti SC,Noto Serif SC,serif" font-size="86" font-weight="900">读记</text>
+  <text x="386" y="77" fill="#254cda" font-family="Arial,sans-serif" font-size="23" font-weight="700" letter-spacing="2">READING</text>
+  <text x="386" y="112" fill="#254cda" font-family="Arial,sans-serif" font-size="23" font-weight="700" letter-spacing="2">NOTES</text>
+</svg>
