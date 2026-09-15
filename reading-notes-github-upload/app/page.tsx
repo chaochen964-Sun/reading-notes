@@ -175,7 +175,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (profile) refresh(profile.deviceId);
+    if (profile) refresh(profile.deviceId, profile.name);
   }, [profile]);
 
   const cycles = useMemo(() => cleanCycles(board.cycles || []), [board.cycles]);
@@ -225,8 +225,9 @@ export default function Home() {
     };
   }, [viewCycle]);
 
-  async function refresh(deviceId = profile?.deviceId || "") {
-    const res = await fetch(`/api/board?deviceId=${encodeURIComponent(deviceId)}`, { cache: "no-store" });
+  async function refresh(deviceId = profile?.deviceId || "", profileName = profile?.name || "") {
+    const params = new URLSearchParams({ deviceId, name: profileName });
+    const res = await fetch(`/api/board?${params.toString()}`, { cache: "no-store" });
     const data = (await res.json().catch(() => ({}))) as Partial<Board> & { error?: string };
     if (res.ok && data.cycles?.length) {
       setBoard(data as Board);
@@ -878,12 +879,20 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="info-card">
+            <div className="info-card my-note-records">
               <BookHeart />
               <div>
-                <b>期次初始化（往期 31 期）</b>
-                <p>如果你希望强制刷新中文书单历史期次与“第 31 期”为当前期，可点下面按钮重新同步一次。</p>
-                <button className="text-button" onClick={() => act({ action: "seedHistory" })}>重建往期书单</button>
+                <b>我的笔记记录</b>
+                <p>这里只显示你自己写过的个人笔记。可以从这里回看、修改或删除。</p>
+                {board.notes.length ? (
+                  <div className="settings-note-list">
+                    {board.notes.map((n) => (
+                      <NoteCard key={n.id} note={n} canEdit onEdit={() => openPersonalNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deletePersonalNote", profile, noteId: n.id }); }} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="quiet">现在还没有个人笔记。</p>
+                )}
               </div>
             </div>
 
@@ -1056,15 +1065,15 @@ function NoteCard({ note, shared = false, canEdit = false, onEdit, onDelete }: {
           <b>{shared ? note.display_name : note.title}</b>
           <small>{note.chapter || "未标章节"} · {new Date(note.created_at).toLocaleDateString("zh-CN")}</small>
         </div>
-        {canEdit && (
-          <div className="note-actions">
-            <button className="icon-button tiny" aria-label="编辑这则共读笔记" onClick={onEdit}><PenLine size={14} /></button>
-            <button className="icon-button tiny danger" aria-label="删除这则共读笔记" onClick={onDelete}><Trash2 size={14} /></button>
-          </div>
-        )}
       </div>
       {note.quote && <blockquote>“{note.quote}”</blockquote>}
       <p>{note.body}</p>
+      {canEdit && (
+        <div className="note-actions">
+          <button className="text-button tiny" onClick={onEdit}>编辑</button>
+          <button className="text-button tiny danger-link" onClick={onDelete}>删除</button>
+        </div>
+      )}
     </article>
   );
 }

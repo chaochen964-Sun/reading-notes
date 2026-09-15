@@ -263,6 +263,14 @@ function hydrateSelectedBooks(board) {
   return changed;
 }
 
+function ownsNote(note, profile) {
+  return Boolean(
+    note?.device_id === profile?.deviceId ||
+    note?.profile?.deviceId === profile?.deviceId ||
+    (!note?.device_id && !note?.profile?.deviceId && note?.display_name && note.display_name === profile?.name)
+  );
+}
+
 async function handlePost(req) {
   const board = await loadBoard();
   const data = await req.json();
@@ -297,11 +305,11 @@ async function handlePost(req) {
     const book = board.books.find((item) => item.id === data.bookId) || {};
     board.notes.unshift({ id: `note-${id()}`, title: book.title || "", ...data, book_id: data.bookId, device_id: data.profile.deviceId, display_name: data.profile.name, avatar: data.profile.avatar, created_at: now() });
   } else if (data.action === "updatePersonalNote") {
-    const index = board.notes.findIndex((note) => note.id === data.noteId && note.device_id === data.profile.deviceId);
+    const index = board.notes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
     if (index < 0) return json({ error: "只能修改自己的个人笔记" }, 404);
-    board.notes[index] = { ...board.notes[index], chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", display_name: data.profile.name, avatar: data.profile.avatar };
+    board.notes[index] = { ...board.notes[index], device_id: data.profile.deviceId, chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", display_name: data.profile.name, avatar: data.profile.avatar };
   } else if (data.action === "deletePersonalNote") {
-    const index = board.notes.findIndex((note) => note.id === data.noteId && note.device_id === data.profile.deviceId);
+    const index = board.notes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
     if (index < 0) return json({ error: "只能删除自己的个人笔记" }, 404);
     board.notes.splice(index, 1);
   } else if (data.action === "groupNote") {
@@ -346,7 +354,9 @@ async function handlePost(req) {
   } else if (data.action === "newCycle") {
     board.cycles = board.cycles.map((cycle) => ({ ...cycle, is_active: 0 }));
     board.cycles.unshift({ id: `cycle-${id()}`, eyebrow: data.eyebrow || "新一期共读", title: data.title || "未命名期次", selected_book_id: null, summary: "", is_active: 1, created_at: now() });
-  } else if (data.action !== "seedHistory") {
+  } else if (data.action === "seedHistory") {
+    return json({ error: "重建往期书单已关闭，避免误删大家已经输入的内容。" }, 403);
+  } else {
     return json({ error: "未知操作" }, 400);
   }
 
@@ -358,10 +368,12 @@ async function handlePost(req) {
 async function handleRequest(req) {
   if (req.method === "GET") {
     const board = await loadBoard();
-    const deviceId = new URL(req.url).searchParams.get("deviceId") || "";
+    const params = new URL(req.url).searchParams;
+    const deviceId = params.get("deviceId") || "";
+    const name = params.get("name") || "";
     if (deviceId) {
       board.library = (board.library || []).filter((entry) => entry.device_id === deviceId);
-      board.notes = (board.notes || []).filter((note) => note.device_id === deviceId);
+      board.notes = (board.notes || []).filter((note) => ownsNote(note, { deviceId, name }));
     } else {
       board.library = [];
       board.notes = [];
