@@ -119,11 +119,15 @@ function mergeSeedMetadata(board) {
       const seed = byId.get(item.id);
       if (!seed) return item;
       const next = { ...item };
-      for (const field of ["isbn", "title", "authors", "publisher", "cover_url", "selected_isbn", "selected_title", "selected_authors", "selected_cover"]) {
-        if (seed[field] !== undefined && next[field] !== seed[field]) {
+      for (const field of ["cover_url"]) {
+        if (seed[field] && !next[field]) {
           next[field] = seed[field];
           changed = true;
         }
+      }
+      if (key === "cycles" && seed.selected_cover && !next.selected_cover) {
+        next.selected_cover = seed.selected_cover;
+        changed = true;
       }
       return next;
     });
@@ -283,9 +287,11 @@ async function handlePost(req) {
     const book = upsertBook(board, data.book);
     const index = board.nominees.findIndex((nominee) => nominee.id === data.nomineeId && nominee.cycle_id === data.cycleId);
     if (index < 0) return json({ error: "未找到目标推选书目" }, 404);
+    const oldBookId = board.nominees[index].book_id;
+    const wasSelected = board.cycles.some((cycle) => cycle.id === data.cycleId && cycle.selected_book_id === oldBookId);
     const nominee = { ...board.nominees[index], ...nomineeBookFields(book), note: data.note || "" };
     board.nominees[index] = nominee;
-    if (data.select || board.cycles.some((cycle) => cycle.id === data.cycleId && cycle.selected_book_id === board.nominees[index].book_id)) {
+    if (data.select || wasSelected) {
       board.cycles = board.cycles.map((cycle) => cycle.id === data.cycleId ? { ...cycle, ...selectedFields(nominee) } : cycle);
     }
   } else if (data.action === "deleteNominee") {

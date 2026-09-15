@@ -4,6 +4,8 @@ create table if not exists public.reading_notes_state (
   updated_at timestamptz not null default now()
 );
 
+alter table public.reading_notes_state disable row level security;
+
 create or replace function public.set_reading_notes_updated_at()
 returns trigger
 language plpgsql
