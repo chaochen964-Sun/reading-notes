@@ -148,6 +148,7 @@ export default function Home() {
   const [modal, setModal] = useState<null | "book" | "note" | "nominate" | "groupNote" | "cycle" | "summary">(null);
   const [editingNomineeId, setEditingNomineeId] = useState<string | null>(null);
   const [editingNomineeCycleId, setEditingNomineeCycleId] = useState<string | null>(null);
+  const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null);
   const [cycleForm, setCycleForm] = useState({ id: "", eyebrow: "", title: "" });
   const [book, setBook] = useState<BookDraft>(blank);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
@@ -161,6 +162,8 @@ export default function Home() {
   const [boardError, setBoardError] = useState("");
   const [viewCycleId, setViewCycleId] = useState("");
   const [groupNoteTarget, setGroupNoteTarget] = useState<GroupNoteTarget | null>(null);
+  const [editingGroupNoteId, setEditingGroupNoteId] = useState<string | null>(null);
+  const [editingPersonalNoteId, setEditingPersonalNoteId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -268,6 +271,9 @@ export default function Home() {
     setEditingNomineeId(null);
     setEditingNomineeCycleId(null);
     setGroupNoteTarget(null);
+    setEditingGroupNoteId(null);
+    setEditingPersonalNoteId(null);
+    setEditingLibraryId(null);
     setBook(blank);
     setBody("");
     setQuote("");
@@ -383,9 +389,41 @@ export default function Home() {
 
   function openNote(entry: any) {
     setSelectedEntry(entry);
+    setEditingPersonalNoteId(null);
     setChapter(entry.current_chapter || "");
+    setQuote("");
+    setBody("");
     setGroupNoteTarget(null);
+    setEditingGroupNoteId(null);
     setModal("note");
+  }
+
+  function openPersonalNoteEditor(note: any) {
+    setSelectedEntry(note);
+    setEditingPersonalNoteId(note.id);
+    setChapter(note.chapter || "");
+    setQuote(note.quote || "");
+    setBody(note.body || "");
+    setGroupNoteTarget(null);
+    setEditingGroupNoteId(null);
+    setModal("note");
+  }
+
+  function openLibraryEditor(entry: any) {
+    setEditingLibraryId(entry.id);
+    setBook({
+      isbn: entry.isbn || "",
+      title: entry.title || "",
+      authors: entry.authors || "",
+      publisher: entry.publisher || "",
+      publishedDate: entry.published_date || "",
+      coverUrl: entry.cover_url || "",
+      podcastUrl: entry.podcast_url || "",
+      chapters: parseChapters(entry.chapters_json),
+    });
+    setStatus(entry.status || "reading");
+    setProgress(Number(entry.progress || 0));
+    setModal("book");
   }
 
   function openGroupNoteFor(entry: any, cycle: any) {
@@ -394,9 +432,20 @@ export default function Home() {
 
     setSelectedEntry(entry);
     setGroupNoteTarget({ cycleId: cycle.id, bookId });
+    setEditingGroupNoteId(null);
     setChapter(entry.current_chapter || entry.chapter || "");
     setQuote("");
     setBody("");
+    setModal("groupNote");
+  }
+
+  function openGroupNoteEditor(note: any) {
+    setSelectedEntry(note);
+    setGroupNoteTarget({ cycleId: note.cycle_id, bookId: note.book_id });
+    setEditingGroupNoteId(note.id);
+    setChapter(note.chapter || "");
+    setQuote(note.quote || "");
+    setBody(note.body || "");
     setModal("groupNote");
   }
 
@@ -546,7 +595,7 @@ export default function Home() {
                 <h1>我的<span>阅读</span><i aria-hidden="true">.</i></h1>
                 <p>一本一本，留下自己的阅读年轮。</p>
               </div>
-              <button className="primary" onClick={() => { setBook(blank); setModal("book"); }}><Plus size={18} />加入一本书</button>
+              <button className="primary" onClick={() => { setBook(blank); setEditingLibraryId(null); setStatus("reading"); setProgress(20); setModal("book"); }}><Plus size={18} />加入一本书</button>
             </section>
 
             <section className="stat-ribbon" aria-label="阅读记录">
@@ -588,7 +637,10 @@ export default function Home() {
                               <div className="progress-track"><i style={{ width: `${entry.progress}%` }} /></div>
                             </>
                           )}
-                          <button className="text-button" onClick={() => openNote(entry)}>写笔记 <ChevronRight size={16} /></button>
+                          <div className="button-row compact">
+                            <button className="text-button" onClick={() => openNote(entry)}>写笔记 <ChevronRight size={16} /></button>
+                            <button className="text-button" onClick={() => openLibraryEditor(entry)}>编辑书目</button>
+                          </div>
                         </div>
                       </article>
                     ))}
@@ -609,7 +661,7 @@ export default function Home() {
                 </div>
                 {board.notes.length ? (
                   <div className="notes-list">
-                    {board.notes.slice(0, 4).map((n) => <NoteCard key={n.id} note={n} />)}
+                    {board.notes.slice(0, 4).map((n) => <NoteCard key={n.id} note={n} canEdit onEdit={() => openPersonalNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deletePersonalNote", profile, noteId: n.id }); }} />)}
                   </div>
                 ) : (
                   <div className="notes-empty">
@@ -740,7 +792,7 @@ export default function Home() {
             <section className="notes-section">
               <div className="section-title"><div><h2>章节与共读笔记</h2></div></div>
               {viewGroupNotes.length ? (
-                <div className="notes-list">{viewGroupNotes.map((n) => <NoteCard key={n.id} note={n} shared />)}</div>
+                <div className="notes-list">{viewGroupNotes.map((n) => <NoteCard key={n.id} note={n} shared canEdit={Boolean(profile && n.device_id === profile.deviceId)} onEdit={() => openGroupNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deleteGroupNote", profile, noteId: n.id }); }} />)}</div>
               ) : (
                 <Empty
                   icon={<MessageCircle />}
@@ -886,9 +938,9 @@ export default function Home() {
             <>
               <label>放到书架<select value={status} onChange={(e) => setStatus(e.target.value)}><option value="wish">想读</option><option value="reading">在读</option><option value="finished">已读</option></select></label>
               {status === "reading" && <label>当前进度 <b>{progress}%</b><input type="range" min="0" max="100" value={progress} onChange={(e) => setProgress(Number(e.target.value))} /></label>}
-              <button className="primary full" disabled={!book.title || loading} onClick={() => act({ action: "saveLibrary", profile, book, status, progress })}>
+              <button className="primary full" disabled={!book.title || loading} onClick={() => act({ action: "saveLibrary", profile, libraryId: editingLibraryId, book, status, progress })}>
                 {loading ? <LoaderCircle className="spin" /> : <Bookmark />}
-                保存到书架
+                {editingLibraryId ? "保存书架修改" : "保存到书架"}
               </button>
             </>
           )}
@@ -936,12 +988,15 @@ export default function Home() {
           )}
 
           {modal === "note" && (
-            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act({ action: "personalNote", profile, bookId: selectedEntry.book_id, chapter, quote, body })}>保存个人笔记</button>
+            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act(editingPersonalNoteId ? { action: "updatePersonalNote", profile, noteId: editingPersonalNoteId, chapter, quote, body } : { action: "personalNote", profile, bookId: selectedEntry.book_id, chapter, quote, body })}>{editingPersonalNoteId ? "保存修改" : "保存个人笔记"}</button>
           )}
 
           {modal === "groupNote" && groupNoteTarget && (
-            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act({ action: "groupNote", profile, bookId: groupNoteTarget.bookId, cycleId: groupNoteTarget.cycleId, chapter, quote, body })}>
-              发布到共读区
+            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act(editingGroupNoteId
+              ? { action: "updateGroupNote", profile, noteId: editingGroupNoteId, chapter, quote, body }
+              : { action: "groupNote", profile, bookId: groupNoteTarget.bookId, cycleId: groupNoteTarget.cycleId, chapter, quote, body }
+            )}>
+              {editingGroupNoteId ? "保存修改" : "发布到共读区"}
             </button>
           )}
 
@@ -992,7 +1047,7 @@ function Empty({ icon, title, text, action }: { icon: React.ReactNode; title: st
   );
 }
 
-function NoteCard({ note, shared = false }: { note: any; shared?: boolean }) {
+function NoteCard({ note, shared = false, canEdit = false, onEdit, onDelete }: { note: any; shared?: boolean; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void }) {
   return (
     <article className="note-card">
       <div className="note-meta">
@@ -1001,6 +1056,12 @@ function NoteCard({ note, shared = false }: { note: any; shared?: boolean }) {
           <b>{shared ? note.display_name : note.title}</b>
           <small>{note.chapter || "未标章节"} · {new Date(note.created_at).toLocaleDateString("zh-CN")}</small>
         </div>
+        {canEdit && (
+          <div className="note-actions">
+            <button className="icon-button tiny" aria-label="编辑这则共读笔记" onClick={onEdit}><PenLine size={14} /></button>
+            <button className="icon-button tiny danger" aria-label="删除这则共读笔记" onClick={onDelete}><Trash2 size={14} /></button>
+          </div>
+        )}
       </div>
       {note.quote && <blockquote>“{note.quote}”</blockquote>}
       <p>{note.body}</p>

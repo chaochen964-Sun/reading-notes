@@ -139,7 +139,8 @@ async function loadBoard() {
   const rows = await supabaseFetch(`reading_notes_state?key=eq.${encodeURIComponent(key)}&select=data&limit=1`);
   const board = rows?.[0]?.data;
   if (board?.cycles?.length) {
-    if (mergeSeedMetadata(board)) await saveBoard(board);
+    const changed = mergeSeedMetadata(board) || hydrateSelectedBooks(board);
+    if (changed) await saveBoard(board);
     return board;
   }
   const seeded = seedBoard();
@@ -235,7 +236,7 @@ function nomineeBookFields(book) {
 
 function selectedFields(nominee) {
   return {
-    selected_book_id: nominee.book_id,
+    selected_book_id: nominee.book_id || nominee.id,
     selected_title: nominee.title,
     selected_authors: nominee.authors,
     selected_cover: nominee.cover_url,
@@ -245,13 +246,32 @@ function selectedFields(nominee) {
   };
 }
 
+function hydrateSelectedBooks(board) {
+  let changed = false;
+  const bookById = new Map((board.books || []).map((book) => [book.id, book]));
+  const nomineeByBookId = new Map((board.nominees || []).map((nominee) => [nominee.book_id, nominee]));
+
+  board.cycles = (board.cycles || []).map((cycle) => {
+    if (!cycle.selected_book_id) return cycle;
+    const source = nomineeByBookId.get(cycle.selected_book_id) || bookById.get(cycle.selected_book_id);
+    if (!source) return cycle;
+    const next = { ...cycle, ...selectedFields(source) };
+    if (JSON.stringify(next) !== JSON.stringify(cycle)) changed = true;
+    return next;
+  });
+
+  return changed;
+}
+
 async function handlePost(req) {
   const board = await loadBoard();
   const data = await req.json();
 
   if (data.action === "saveLibrary") {
     const book = upsertBook(board, data.book);
-    const existingIndex = board.library.findIndex((entry) => entry.device_id === data.profile.deviceId && entry.book_id === book.id);
+    const ownLibrary = (entry) => entry.device_id === data.profile.deviceId;
+    let existingIndex = board.library.findIndex((entry) => ownLibrary(entry) && data.libraryId && entry.id === data.libraryId);
+    if (existingIndex < 0) existingIndex = board.library.findIndex((entry) => ownLibrary(entry) && entry.book_id === book.id);
     const entry = {
       id: existingIndex >= 0 ? board.library[existingIndex].id : `library-${id()}`,
       device_id: data.profile.deviceId,
@@ -260,6 +280,7 @@ async function handlePost(req) {
       book_id: book.id,
       title: book.title,
       authors: book.authors,
+      publisher: book.publisher,
       isbn: book.isbn,
       cover_url: book.cover_url,
       podcast_url: book.podcast_url,
@@ -274,10 +295,26 @@ async function handlePost(req) {
     else board.library.push(entry);
   } else if (data.action === "personalNote") {
     const book = board.books.find((item) => item.id === data.bookId) || {};
-    board.notes.unshift({ id: `note-${id()}`, title: book.title || "", ...data, book_id: data.bookId, display_name: data.profile.name, avatar: data.profile.avatar, created_at: now() });
+    board.notes.unshift({ id: `note-${id()}`, title: book.title || "", ...data, book_id: data.bookId, device_id: data.profile.deviceId, display_name: data.profile.name, avatar: data.profile.avatar, created_at: now() });
+  } else if (data.action === "updatePersonalNote") {
+    const index = board.notes.findIndex((note) => note.id === data.noteId && note.device_id === data.profile.deviceId);
+    if (index < 0) return json({ error: "只能修改自己的个人笔记" }, 404);
+    board.notes[index] = { ...board.notes[index], chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", display_name: data.profile.name, avatar: data.profile.avatar };
+  } else if (data.action === "deletePersonalNote") {
+    const index = board.notes.findIndex((note) => note.id === data.noteId && note.device_id === data.profile.deviceId);
+    if (index < 0) return json({ error: "只能删除自己的个人笔记" }, 404);
+    board.notes.splice(index, 1);
   } else if (data.action === "groupNote") {
     const book = board.books.find((item) => item.id === data.bookId) || {};
     board.groupNotes.unshift({ id: `group-${id()}`, title: book.title || "", cycle_id: data.cycleId, book_id: data.bookId, device_id: data.profile.deviceId, display_name: data.profile.name, avatar: data.profile.avatar, chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", created_at: now() });
+  } else if (data.action === "updateGroupNote") {
+    const index = board.groupNotes.findIndex((note) => note.id === data.noteId && note.device_id === data.profile.deviceId);
+    if (index < 0) return json({ error: "只能修改自己写的共读笔记" }, 404);
+    board.groupNotes[index] = { ...board.groupNotes[index], chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", display_name: data.profile.name, avatar: data.profile.avatar };
+  } else if (data.action === "deleteGroupNote") {
+    const index = board.groupNotes.findIndex((note) => note.id === data.noteId && note.device_id === data.profile.deviceId);
+    if (index < 0) return json({ error: "只能删除自己写的共读笔记" }, 404);
+    board.groupNotes.splice(index, 1);
   } else if (data.action === "nominate") {
     const book = upsertBook(board, data.book);
     const nominee = { id: `nominee-${id()}`, cycle_id: data.cycleId, ...nomineeBookFields(book), note: data.note || "", created_at: now() };
@@ -313,12 +350,24 @@ async function handlePost(req) {
     return json({ error: "未知操作" }, 400);
   }
 
+  hydrateSelectedBooks(board);
   await saveBoard(board);
   return json({ ok: true });
 }
 
 async function handleRequest(req) {
-  if (req.method === "GET") return json(await loadBoard());
+  if (req.method === "GET") {
+    const board = await loadBoard();
+    const deviceId = new URL(req.url).searchParams.get("deviceId") || "";
+    if (deviceId) {
+      board.library = (board.library || []).filter((entry) => entry.device_id === deviceId);
+      board.notes = (board.notes || []).filter((note) => note.device_id === deviceId);
+    } else {
+      board.library = [];
+      board.notes = [];
+    }
+    return json(board);
+  }
   if (req.method === "POST") return handlePost(req);
   return json({ error: "Method not allowed" }, 405);
 }

@@ -193,6 +193,8 @@ svg { flex-shrink: 0; }
 .quote-search { width: 100%; background: #e8eefc; color: #244b9f; padding: 11px; border-radius: 6px; font-size: 14px; flex-wrap: wrap; }
 .quote-search small { font-size: 12px; }
 .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.button-row.compact { display: flex; flex-wrap: wrap; gap: 12px; margin-top: auto; }
+.note-actions { margin-left: auto; display: flex!important; flex-direction: row!important; gap: 6px; }
 .profile-modal { display: grid; grid-template-columns: .85fr 1.15fr; width: min(840px,100%); padding: 0; border-radius: 16px; }
 .welcome-brand { background: var(--accent); color: white; padding: 38px; display: flex; flex-direction: column; align-items: flex-start; }
 .welcome-icon img { width: 90px; height: 90px; }
