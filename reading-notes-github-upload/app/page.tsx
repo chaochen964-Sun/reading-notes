@@ -225,6 +225,13 @@ export default function Home() {
     };
   }, [viewCycle]);
 
+  const isMyNote = (note: any) => Boolean(profile && (
+    note.device_id === profile.deviceId ||
+    note.profile?.deviceId === profile.deviceId ||
+    (!note.device_id && !note.profile?.deviceId && note.display_name === profile.name)
+  ));
+  const myGroupNotes = useMemo(() => board.groupNotes.filter(isMyNote), [board.groupNotes, profile]);
+
   async function refresh(deviceId = profile?.deviceId || "", profileName = profile?.name || "") {
     const params = new URLSearchParams({ deviceId, name: profileName });
     const res = await fetch(`/api/board?${params.toString()}`, { cache: "no-store" });
@@ -793,7 +800,7 @@ export default function Home() {
             <section className="notes-section">
               <div className="section-title"><div><h2>章节与共读笔记</h2></div></div>
               {viewGroupNotes.length ? (
-                <div className="notes-list">{viewGroupNotes.map((n) => <NoteCard key={n.id} note={n} shared canEdit={Boolean(profile && n.device_id === profile.deviceId)} onEdit={() => openGroupNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deleteGroupNote", profile, noteId: n.id }); }} />)}</div>
+                <div className="notes-list">{viewGroupNotes.map((n) => <NoteCard key={n.id} note={n} shared canEdit={isMyNote(n)} onEdit={() => openGroupNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deleteGroupNote", profile, noteId: n.id }); }} />)}</div>
               ) : (
                 <Empty
                   icon={<MessageCircle />}
@@ -883,15 +890,18 @@ export default function Home() {
               <BookHeart />
               <div>
                 <b>我的笔记记录</b>
-                <p>这里只显示你自己写过的个人笔记。可以从这里回看、修改或删除。</p>
-                {board.notes.length ? (
+                <p>这里会显示你自己写过的个人笔记和共读笔记。可以从这里回看、修改或删除。</p>
+                {board.notes.length || myGroupNotes.length ? (
                   <div className="settings-note-list">
                     {board.notes.map((n) => (
                       <NoteCard key={n.id} note={n} canEdit onEdit={() => openPersonalNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deletePersonalNote", profile, noteId: n.id }); }} />
                     ))}
+                    {myGroupNotes.map((n) => (
+                      <NoteCard key={n.id} note={n} shared canEdit onEdit={() => openGroupNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deleteGroupNote", profile, noteId: n.id }); }} />
+                    ))}
                   </div>
                 ) : (
-                  <p className="quiet">现在还没有个人笔记。</p>
+                  <p className="quiet">现在还没有自己的笔记。</p>
                 )}
               </div>
             </div>

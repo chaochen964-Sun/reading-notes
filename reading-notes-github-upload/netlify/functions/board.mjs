@@ -316,11 +316,11 @@ async function handlePost(req) {
     const book = board.books.find((item) => item.id === data.bookId) || {};
     board.groupNotes.unshift({ id: `group-${id()}`, title: book.title || "", cycle_id: data.cycleId, book_id: data.bookId, device_id: data.profile.deviceId, display_name: data.profile.name, avatar: data.profile.avatar, chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", created_at: now() });
   } else if (data.action === "updateGroupNote") {
-    const index = board.groupNotes.findIndex((note) => note.id === data.noteId && note.device_id === data.profile.deviceId);
+    const index = board.groupNotes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
     if (index < 0) return json({ error: "只能修改自己写的共读笔记" }, 404);
-    board.groupNotes[index] = { ...board.groupNotes[index], chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", display_name: data.profile.name, avatar: data.profile.avatar };
+    board.groupNotes[index] = { ...board.groupNotes[index], device_id: data.profile.deviceId, chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", display_name: data.profile.name, avatar: data.profile.avatar };
   } else if (data.action === "deleteGroupNote") {
-    const index = board.groupNotes.findIndex((note) => note.id === data.noteId && note.device_id === data.profile.deviceId);
+    const index = board.groupNotes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
     if (index < 0) return json({ error: "只能删除自己写的共读笔记" }, 404);
     board.groupNotes.splice(index, 1);
   } else if (data.action === "nominate") {
