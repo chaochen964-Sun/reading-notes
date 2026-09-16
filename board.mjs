@@ -1,5 +1,3 @@
-import { connectLambda, getStore } from "@netlify/blobs";
-
 const key = "public-board";
 const now = () => Date.now();
 const id = () => crypto.randomUUID();
@@ -121,11 +119,15 @@ function mergeSeedMetadata(board) {
       const seed = byId.get(item.id);
       if (!seed) return item;
       const next = { ...item };
-      for (const field of ["isbn", "title", "authors", "publisher", "cover_url", "selected_isbn", "selected_title", "selected_authors", "selected_cover"]) {
-        if (seed[field] !== undefined && next[field] !== seed[field]) {
+      for (const field of ["cover_url"]) {
+        if (seed[field] && !next[field]) {
           next[field] = seed[field];
           changed = true;
         }
+      }
+      if (key === "cycles" && seed.selected_cover && !next.selected_cover) {
+        next.selected_cover = seed.selected_cover;
+        changed = true;
       }
       return next;
     });
@@ -134,23 +136,59 @@ function mergeSeedMetadata(board) {
 }
 
 async function loadBoard() {
-  const store = getStore("reading-notes");
-  const board = await store.get(key, { type: "json" });
+  const rows = await supabaseFetch(`reading_notes_state?key=eq.${encodeURIComponent(key)}&select=data&limit=1`);
+  const board = rows?.[0]?.data;
   if (board?.cycles?.length) {
-    if (mergeSeedMetadata(board)) await store.setJSON(key, board);
+    const changed = mergeSeedMetadata(board) || hydrateSelectedBooks(board);
+    if (changed) await saveBoard(board);
     return board;
   }
   const seeded = seedBoard();
-  await store.setJSON(key, seeded);
+  await saveBoard(seeded);
   return seeded;
 }
 
 async function saveBoard(board) {
-  await getStore("reading-notes").setJSON(key, board);
+  await supabaseFetch("reading_notes_state", {
+    method: "POST",
+    headers: { prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key, data: board }),
+  });
 }
 
 function json(body, status = 200) {
   return Response.json(body, { status });
+}
+
+function supabaseConfig() {
+  const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error("Supabase 还没有配置：请在 Netlify Environment variables 添加 SUPABASE_URL 和 SUPABASE_SERVICE_ROLE_KEY");
+  }
+  return { url, key };
+}
+
+async function supabaseFetch(path, options = {}) {
+  const config = supabaseConfig();
+  const response = await fetch(`${config.url}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: config.key,
+      authorization: `Bearer ${config.key}`,
+      "content-type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `Supabase request failed: ${response.status}`);
+  }
+
+  if (response.status === 204) return null;
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 function normalizeBook(input = {}) {
@@ -198,7 +236,7 @@ function nomineeBookFields(book) {
 
 function selectedFields(nominee) {
   return {
-    selected_book_id: nominee.book_id,
+    selected_book_id: nominee.book_id || nominee.id,
     selected_title: nominee.title,
     selected_authors: nominee.authors,
     selected_cover: nominee.cover_url,
@@ -208,13 +246,40 @@ function selectedFields(nominee) {
   };
 }
 
+function hydrateSelectedBooks(board) {
+  let changed = false;
+  const bookById = new Map((board.books || []).map((book) => [book.id, book]));
+  const nomineeByBookId = new Map((board.nominees || []).map((nominee) => [nominee.book_id, nominee]));
+
+  board.cycles = (board.cycles || []).map((cycle) => {
+    if (!cycle.selected_book_id) return cycle;
+    const source = nomineeByBookId.get(cycle.selected_book_id) || bookById.get(cycle.selected_book_id);
+    if (!source) return cycle;
+    const next = { ...cycle, ...selectedFields(source) };
+    if (JSON.stringify(next) !== JSON.stringify(cycle)) changed = true;
+    return next;
+  });
+
+  return changed;
+}
+
+function ownsNote(note, profile) {
+  return Boolean(
+    note?.device_id === profile?.deviceId ||
+    note?.profile?.deviceId === profile?.deviceId ||
+    (!note?.device_id && !note?.profile?.deviceId && note?.display_name && note.display_name === profile?.name)
+  );
+}
+
 async function handlePost(req) {
   const board = await loadBoard();
   const data = await req.json();
 
   if (data.action === "saveLibrary") {
     const book = upsertBook(board, data.book);
-    const existingIndex = board.library.findIndex((entry) => entry.device_id === data.profile.deviceId && entry.book_id === book.id);
+    const ownLibrary = (entry) => entry.device_id === data.profile.deviceId;
+    let existingIndex = board.library.findIndex((entry) => ownLibrary(entry) && data.libraryId && entry.id === data.libraryId);
+    if (existingIndex < 0) existingIndex = board.library.findIndex((entry) => ownLibrary(entry) && entry.book_id === book.id);
     const entry = {
       id: existingIndex >= 0 ? board.library[existingIndex].id : `library-${id()}`,
       device_id: data.profile.deviceId,
@@ -223,6 +288,7 @@ async function handlePost(req) {
       book_id: book.id,
       title: book.title,
       authors: book.authors,
+      publisher: book.publisher,
       isbn: book.isbn,
       cover_url: book.cover_url,
       podcast_url: book.podcast_url,
@@ -237,10 +303,26 @@ async function handlePost(req) {
     else board.library.push(entry);
   } else if (data.action === "personalNote") {
     const book = board.books.find((item) => item.id === data.bookId) || {};
-    board.notes.unshift({ id: `note-${id()}`, title: book.title || "", ...data, book_id: data.bookId, display_name: data.profile.name, avatar: data.profile.avatar, created_at: now() });
+    board.notes.unshift({ id: `note-${id()}`, title: book.title || "", ...data, image_url: data.imageUrl || "", book_id: data.bookId, device_id: data.profile.deviceId, display_name: data.profile.name, avatar: data.profile.avatar, created_at: now() });
+  } else if (data.action === "updatePersonalNote") {
+    const index = board.notes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
+    if (index < 0) return json({ error: "只能修改自己的个人笔记" }, 404);
+    board.notes[index] = { ...board.notes[index], device_id: data.profile.deviceId, chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", image_url: data.imageUrl || "", display_name: data.profile.name, avatar: data.profile.avatar };
+  } else if (data.action === "deletePersonalNote") {
+    const index = board.notes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
+    if (index < 0) return json({ error: "只能删除自己的个人笔记" }, 404);
+    board.notes.splice(index, 1);
   } else if (data.action === "groupNote") {
     const book = board.books.find((item) => item.id === data.bookId) || {};
-    board.groupNotes.unshift({ id: `group-${id()}`, title: book.title || "", cycle_id: data.cycleId, book_id: data.bookId, device_id: data.profile.deviceId, display_name: data.profile.name, avatar: data.profile.avatar, chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", created_at: now() });
+    board.groupNotes.unshift({ id: `group-${id()}`, title: book.title || "", cycle_id: data.cycleId, book_id: data.bookId, device_id: data.profile.deviceId, display_name: data.profile.name, avatar: data.profile.avatar, chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", image_url: data.imageUrl || "", created_at: now() });
+  } else if (data.action === "updateGroupNote") {
+    const index = board.groupNotes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
+    if (index < 0) return json({ error: "只能修改自己写的共读笔记" }, 404);
+    board.groupNotes[index] = { ...board.groupNotes[index], device_id: data.profile.deviceId, chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", image_url: data.imageUrl || "", display_name: data.profile.name, avatar: data.profile.avatar };
+  } else if (data.action === "deleteGroupNote") {
+    const index = board.groupNotes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
+    if (index < 0) return json({ error: "只能删除自己写的共读笔记" }, 404);
+    board.groupNotes.splice(index, 1);
   } else if (data.action === "nominate") {
     const book = upsertBook(board, data.book);
     const nominee = { id: `nominee-${id()}`, cycle_id: data.cycleId, ...nomineeBookFields(book), note: data.note || "", created_at: now() };
@@ -250,9 +332,11 @@ async function handlePost(req) {
     const book = upsertBook(board, data.book);
     const index = board.nominees.findIndex((nominee) => nominee.id === data.nomineeId && nominee.cycle_id === data.cycleId);
     if (index < 0) return json({ error: "未找到目标推选书目" }, 404);
+    const oldBookId = board.nominees[index].book_id;
+    const wasSelected = board.cycles.some((cycle) => cycle.id === data.cycleId && cycle.selected_book_id === oldBookId);
     const nominee = { ...board.nominees[index], ...nomineeBookFields(book), note: data.note || "" };
     board.nominees[index] = nominee;
-    if (data.select || board.cycles.some((cycle) => cycle.id === data.cycleId && cycle.selected_book_id === board.nominees[index].book_id)) {
+    if (data.select || wasSelected) {
       board.cycles = board.cycles.map((cycle) => cycle.id === data.cycleId ? { ...cycle, ...selectedFields(nominee) } : cycle);
     }
   } else if (data.action === "deleteNominee") {
@@ -270,26 +354,44 @@ async function handlePost(req) {
   } else if (data.action === "newCycle") {
     board.cycles = board.cycles.map((cycle) => ({ ...cycle, is_active: 0 }));
     board.cycles.unshift({ id: `cycle-${id()}`, eyebrow: data.eyebrow || "新一期共读", title: data.title || "未命名期次", selected_book_id: null, summary: "", is_active: 1, created_at: now() });
-  } else if (data.action !== "seedHistory") {
+  } else if (data.action === "seedHistory") {
+    return json({ error: "重建往期书单已关闭，避免误删大家已经输入的内容。" }, 403);
+  } else {
     return json({ error: "未知操作" }, 400);
   }
 
+  hydrateSelectedBooks(board);
   await saveBoard(board);
   return json({ ok: true });
 }
 
 async function handleRequest(req) {
-  if (req.method === "GET") return json(await loadBoard());
+  if (req.method === "GET") {
+    const board = await loadBoard();
+    const params = new URL(req.url).searchParams;
+    const deviceId = params.get("deviceId") || "";
+    const name = params.get("name") || "";
+    if (deviceId) {
+      board.library = (board.library || []).filter((entry) => entry.device_id === deviceId);
+      board.notes = (board.notes || []).filter((note) => ownsNote(note, { deviceId, name }));
+    } else {
+      board.library = [];
+      board.notes = [];
+    }
+    return json(board);
+  }
   if (req.method === "POST") return handlePost(req);
   return json({ error: "Method not allowed" }, 405);
 }
 
 export async function handler(event) {
-  connectLambda(event);
   const body = event.body && event.httpMethod !== "GET"
     ? event.isBase64Encoded ? Buffer.from(event.body, "base64") : event.body
     : undefined;
-  const req = new Request(`https://readingnotes.local` + (event.rawUrl || event.path || "/api/board"), {
+  const requestUrl = event.rawUrl?.startsWith("http")
+    ? event.rawUrl
+    : `https://readingnotes.local${event.rawUrl || event.path || "/api/board"}`;
+  const req = new Request(requestUrl, {
     method: event.httpMethod,
     headers: event.headers || {},
     body,

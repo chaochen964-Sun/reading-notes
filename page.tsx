@@ -15,33 +15,33 @@ const statusLabel: Record<string, string> = { wish: "想读", reading: "在读",
 const fallbackBoardStorageKey = "readingnotes-public-fallback-board";
 
 const fallbackBooks = [
-  ["1", "9787532180011", "吞下宇宙的男孩", "", "上海文艺出版社（果麦）"],
-  ["2", "9787532777532", "长日将尽", "", "上海译文出版社（冯涛译）"],
-  ["3", "9787532762897", "小径分岔的花园", "", "上海译文出版社（王永年译）"],
-  ["4", "9787201134598", "罗生门", "", "天津人民出版社（高慧勤译，果麦出品）"],
-  ["5", "9787544736541", "彼时此刻：马基雅维利在伊莫拉", "", "译林出版社"],
-  ["6", "9787508672717", "人生复本", "", "中信出版社（布莱克·克劳奇）"],
-  ["7", "9787532791620", "一个人的房间", "", "上海译文出版社（瞿世镜译）"],
-  ["8", "9789579001847", "你不爽，为什么不明说？", "", "橡实文化（繁体主流）"],
-  ["9", "9787532759538", "金阁寺", "", "上海译文出版社（唐月梅译）"],
-  ["10", "9787554605424", "人性的弱点", "", "古吴轩出版社（完整全译本）"],
-  ["11", "9787532752393", "1984", "", "上海译文出版社（董乐山译）"],
-  ["12", "9787544722278", "看不见的城市", "", "译林出版社（张密译）"],
-  ["13", "9787544292597", "献给阿尔吉侬的花束", "", "南海出版公司"],
-  ["14", "9787020122349", "马丁·伊登", "", "人民文学出版社"],
-  ["15", "9787020104598", "大师与玛格丽特", "", "人民文学出版社"],
-  ["16", "9787544294010", "The Silent Patient（《无声的病人》）", "", "南海出版公司"],
-  ["17", "9787532774986", "公羊的节日", "", "上海译文出版社"],
-  ["18", "9787544291309", "一桩事先张扬的凶杀案", "", "南海出版公司"],
-  ["19", "9787544768917", "树上的男爵", "", "译林出版社"],
-  ["20", "9787020126781", "象棋的故事", "", "人民文学出版社"],
-  ["21", "9787532778205", "宠物公墓", "", "上海译文出版社"],
-  ["22", "9787532779996", "未来学大会", "", "上海译文出版社"],
-  ["23", "9787020162347", "没有墓碑的草原", "", "人民文学出版社"],
-  ["24", "9787559648655", "鱼不存在", "", "北京联合出版公司"],
-  ["25", "manual-cycle-25", "特辑《佛教艺术赏析》", "", "非单一图书，多为专题/画册，无统一ISBN"],
-  ["26", "9787544775122", "作家城堡", "", "译林出版社（卡尔维诺相关）"],
-  ["27", "9787115545084", "第一性原理", "", "人民邮电出版社"],
+  ["1", "9787532180011", "吞下宇宙的男孩", "", "上海文艺出版社（果麦）", "https://covers.openlibrary.org/b/isbn/9787532180011-L.jpg"],
+  ["2", "9789573310631", "长日将尽", "", "上海译文出版社（冯涛译）", "https://covers.openlibrary.org/b/isbn/9789573310631-L.jpg"],
+  ["3", "9787533916367", "小径分岔的花园", "", "上海译文出版社（王永年译）", "https://covers.openlibrary.org/b/isbn/9787533916367-L.jpg"],
+  ["4", "9787561370704", "罗生门", "", "天津人民出版社（高慧勤译，果麦出品）", "https://covers.openlibrary.org/b/isbn/9787561370704-L.jpg"],
+  ["5", "9787544736541", "彼时此刻：马基雅维利在伊莫拉", "", "译林出版社", "https://covers.openlibrary.org/b/isbn/9787544736541-L.jpg"],
+  ["6", "9789869170987", "人生复本", "", "中信出版社（布莱克·克劳奇）", "https://covers.openlibrary.org/b/isbn/9789869170987-L.jpg"],
+  ["7", "9787559475800", "一个人的房间", "", "上海译文出版社（瞿世镜译）", "https://covers.openlibrary.org/b/isbn/9787559475800-L.jpg"],
+  ["8", "9787508098463", "你不爽，为什么不明说？", "", "橡实文化（繁体主流）", "https://covers.openlibrary.org/b/isbn/9787508098463-L.jpg"],
+  ["9", "9787543655621", "金阁寺", "", "上海译文出版社（唐月梅译）", "https://covers.openlibrary.org/b/isbn/9787543655621-L.jpg"],
+  ["10", "9787802032460", "人性的弱点", "", "古吴轩出版社（完整全译本）", "https://covers.openlibrary.org/b/isbn/9787802032460-L.jpg"],
+  ["11", "9780451524935", "1984", "", "上海译文出版社（董乐山译）", "https://covers.openlibrary.org/b/isbn/9780451524935-L.jpg"],
+  ["12", "9787544700603", "看不见的城市", "", "译林出版社（张密译）", "https://covers.openlibrary.org/b/isbn/9787544700603-L.jpg"],
+  ["13", "9787555913726", "献给阿尔吉侬的花束", "", "南海出版公司", "https://covers.openlibrary.org/b/isbn/9787555913726-L.jpg"],
+  ["14", "9781438510521", "马丁·伊登", "", "人民文学出版社", "https://covers.openlibrary.org/b/isbn/9781438510521-L.jpg"],
+  ["15", "9787533911287", "大师与玛格丽特", "", "人民文学出版社", "https://covers.openlibrary.org/b/isbn/9787533911287-L.jpg"],
+  ["16", "9787555910749", "The Silent Patient（《无声的病人》）", "", "南海出版公司", "https://covers.openlibrary.org/b/isbn/9787555910749-L.jpg"],
+  ["17", "9787532741243", "公羊的节日", "", "上海译文出版社", "https://covers.openlibrary.org/b/isbn/9787532741243-L.jpg"],
+  ["18", "9787544292467", "一桩事先张扬的凶杀案", "", "南海出版公司", "https://covers.openlibrary.org/b/isbn/9787544292467-L.jpg"],
+  ["19", "9787544778008", "树上的男爵", "", "译林出版社", "https://covers.openlibrary.org/b/isbn/9787544778008-L.jpg"],
+  ["20", "9787508020525", "象棋的故事", "", "人民文学出版社", "https://covers.openlibrary.org/b/isbn/9787508020525-L.jpg"],
+  ["21", "9787532154159", "宠物公墓", "", "上海译文出版社", "https://covers.openlibrary.org/b/isbn/9787532154159-L.jpg"],
+  ["22", "7549645035", "未来学大会", "", "上海译文出版社", "https://covers.openlibrary.org/b/isbn/7549645035-L.jpg"],
+  ["23", "9789865842406", "没有墓碑的草原", "", "人民文学出版社", "https://covers.openlibrary.org/b/isbn/9789865842406-L.jpg"],
+  ["24", "9787572607943", "鱼不存在", "", "北京联合出版公司", "https://covers.openlibrary.org/b/isbn/9787572607943-L.jpg"],
+  ["25", "manual-cycle-25", "特辑《佛教艺术赏析》", "", "非单一图书，多为专题/画册，无统一ISBN", ""],
+  ["26", "9787513361675", "作家城堡", "", "译林出版社（卡尔维诺相关）", "https://covers.openlibrary.org/b/isbn/9787513361675-L.jpg"],
+  ["27", "9787523605109", "第一性原理", "", "人民邮电出版社", "https://covers.openlibrary.org/b/isbn/9787523605109-L.jpg"],
   ["28", "9787530215995", "台北人", "", "北京十月文艺出版社"],
   ["29", "9787020104666", "卡拉马佐夫兄弟", "〔俄〕陀思妥耶夫斯基", "人民文学出版社"],
   ["30", "9787020122356", "包法利夫人", "", "人民文学出版社"],
@@ -58,14 +58,14 @@ const fallbackCurrentBooks = [
 ];
 
 function baseFallbackBoard(): Board {
-  const cycles = fallbackBooks.map(([idx, isbn, title, authors], i) => ({
+  const cycles = fallbackBooks.map(([idx, isbn, title, authors, publisher, cover], i) => ({
     id: `fallback-cycle-${idx}`,
     eyebrow: `第 ${String(i + 1).padStart(2, "0")} 期`,
     title,
     selected_book_id: `fallback-book-${idx}`,
     selected_title: title,
     selected_authors: authors,
-    selected_cover: "",
+    selected_cover: cover || "",
     selected_podcast: "",
     selected_isbn: isbn,
     selected_chapters: "[]",
@@ -73,7 +73,7 @@ function baseFallbackBoard(): Board {
     is_active: i === fallbackBooks.length - 1 ? 1 : 0,
     created_at: i + 1,
   }));
-  const historyNominees = fallbackBooks.slice(0, 30).map(([idx, isbn, title, authors, publisher], i) => ({
+  const historyNominees = fallbackBooks.slice(0, 30).map(([idx, isbn, title, authors, publisher, cover], i) => ({
     id: `fallback-nominee-${idx}`,
     cycle_id: `fallback-cycle-${idx}`,
     book_id: `fallback-book-${idx}`,
@@ -81,7 +81,7 @@ function baseFallbackBoard(): Board {
     title,
     authors,
     publisher,
-    cover_url: "",
+    cover_url: cover || "",
     podcast_url: "",
     published_date: "",
     chapters_json: "[]",
@@ -148,6 +148,7 @@ export default function Home() {
   const [modal, setModal] = useState<null | "book" | "note" | "nominate" | "groupNote" | "cycle" | "summary">(null);
   const [editingNomineeId, setEditingNomineeId] = useState<string | null>(null);
   const [editingNomineeCycleId, setEditingNomineeCycleId] = useState<string | null>(null);
+  const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null);
   const [cycleForm, setCycleForm] = useState({ id: "", eyebrow: "", title: "" });
   const [book, setBook] = useState<BookDraft>(blank);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
@@ -156,11 +157,14 @@ export default function Home() {
   const [chapter, setChapter] = useState("");
   const [quote, setQuote] = useState("");
   const [body, setBody] = useState("");
+  const [noteImageUrl, setNoteImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [boardError, setBoardError] = useState("");
   const [viewCycleId, setViewCycleId] = useState("");
   const [groupNoteTarget, setGroupNoteTarget] = useState<GroupNoteTarget | null>(null);
+  const [editingGroupNoteId, setEditingGroupNoteId] = useState<string | null>(null);
+  const [editingPersonalNoteId, setEditingPersonalNoteId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -172,7 +176,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (profile) refresh(profile.deviceId);
+    if (profile) refresh(profile.deviceId, profile.name);
   }, [profile]);
 
   const cycles = useMemo(() => cleanCycles(board.cycles || []), [board.cycles]);
@@ -222,8 +226,16 @@ export default function Home() {
     };
   }, [viewCycle]);
 
-  async function refresh(deviceId = profile?.deviceId || "") {
-    const res = await fetch(`/api/board?deviceId=${encodeURIComponent(deviceId)}`, { cache: "no-store" });
+  const isMyNote = (note: any) => Boolean(profile && (
+    note.device_id === profile.deviceId ||
+    note.profile?.deviceId === profile.deviceId ||
+    (!note.device_id && !note.profile?.deviceId && note.display_name === profile.name)
+  ));
+  const myGroupNotes = useMemo(() => board.groupNotes.filter(isMyNote), [board.groupNotes, profile]);
+
+  async function refresh(deviceId = profile?.deviceId || "", profileName = profile?.name || "") {
+    const params = new URLSearchParams({ deviceId, name: profileName });
+    const res = await fetch(`/api/board?${params.toString()}`, { cache: "no-store" });
     const data = (await res.json().catch(() => ({}))) as Partial<Board> & { error?: string };
     if (res.ok && data.cycles?.length) {
       setBoard(data as Board);
@@ -268,10 +280,14 @@ export default function Home() {
     setEditingNomineeId(null);
     setEditingNomineeCycleId(null);
     setGroupNoteTarget(null);
+    setEditingGroupNoteId(null);
+    setEditingPersonalNoteId(null);
+    setEditingLibraryId(null);
     setBook(blank);
     setBody("");
     setQuote("");
     setChapter("");
+    setNoteImageUrl("");
   }
 
   function applyFallbackAction(payload: Record<string, unknown>) {
@@ -357,10 +373,7 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    if (applyFallbackAction(payload)) {
-      setLoading(false);
-      return true;
-    }
+    const shouldFallback = String(payload.cycleId || "").startsWith("fallback-") || String(payload.nomineeId || "").startsWith("fallback-");
 
     const res = await fetch("/api/board", {
       method: "POST",
@@ -371,6 +384,10 @@ export default function Home() {
     const data = (await res.json()) as { error?: string };
     setLoading(false);
     if (!res.ok) {
+      if (shouldFallback && applyFallbackAction(payload)) {
+        setLoading(false);
+        return true;
+      }
       setMessage(data.error || "保存失败");
       return false;
     }
@@ -382,9 +399,43 @@ export default function Home() {
 
   function openNote(entry: any) {
     setSelectedEntry(entry);
+    setEditingPersonalNoteId(null);
     setChapter(entry.current_chapter || "");
+    setQuote("");
+    setBody("");
+    setNoteImageUrl("");
     setGroupNoteTarget(null);
+    setEditingGroupNoteId(null);
     setModal("note");
+  }
+
+  function openPersonalNoteEditor(note: any) {
+    setSelectedEntry(note);
+    setEditingPersonalNoteId(note.id);
+    setChapter(note.chapter || "");
+    setQuote(note.quote || "");
+    setBody(note.body || "");
+    setNoteImageUrl(note.image_url || "");
+    setGroupNoteTarget(null);
+    setEditingGroupNoteId(null);
+    setModal("note");
+  }
+
+  function openLibraryEditor(entry: any) {
+    setEditingLibraryId(entry.id);
+    setBook({
+      isbn: entry.isbn || "",
+      title: entry.title || "",
+      authors: entry.authors || "",
+      publisher: entry.publisher || "",
+      publishedDate: entry.published_date || "",
+      coverUrl: entry.cover_url || "",
+      podcastUrl: entry.podcast_url || "",
+      chapters: parseChapters(entry.chapters_json),
+    });
+    setStatus(entry.status || "reading");
+    setProgress(Number(entry.progress || 0));
+    setModal("book");
   }
 
   function openGroupNoteFor(entry: any, cycle: any) {
@@ -393,9 +444,22 @@ export default function Home() {
 
     setSelectedEntry(entry);
     setGroupNoteTarget({ cycleId: cycle.id, bookId });
+    setEditingGroupNoteId(null);
     setChapter(entry.current_chapter || entry.chapter || "");
     setQuote("");
     setBody("");
+    setNoteImageUrl("");
+    setModal("groupNote");
+  }
+
+  function openGroupNoteEditor(note: any) {
+    setSelectedEntry(note);
+    setGroupNoteTarget({ cycleId: note.cycle_id, bookId: note.book_id });
+    setEditingGroupNoteId(note.id);
+    setChapter(note.chapter || "");
+    setQuote(note.quote || "");
+    setBody(note.body || "");
+    setNoteImageUrl(note.image_url || "");
     setModal("groupNote");
   }
 
@@ -545,7 +609,7 @@ export default function Home() {
                 <h1>我的<span>阅读</span><i aria-hidden="true">.</i></h1>
                 <p>一本一本，留下自己的阅读年轮。</p>
               </div>
-              <button className="primary" onClick={() => { setBook(blank); setModal("book"); }}><Plus size={18} />加入一本书</button>
+              <button className="primary" onClick={() => { setBook(blank); setEditingLibraryId(null); setStatus("reading"); setProgress(20); setModal("book"); }}><Plus size={18} />加入一本书</button>
             </section>
 
             <section className="stat-ribbon" aria-label="阅读记录">
@@ -587,7 +651,10 @@ export default function Home() {
                               <div className="progress-track"><i style={{ width: `${entry.progress}%` }} /></div>
                             </>
                           )}
-                          <button className="text-button" onClick={() => openNote(entry)}>写笔记 <ChevronRight size={16} /></button>
+                          <div className="button-row compact">
+                            <button className="text-button" onClick={() => openNote(entry)}>写笔记 <ChevronRight size={16} /></button>
+                            <button className="text-button" onClick={() => openLibraryEditor(entry)}>编辑书目</button>
+                          </div>
                         </div>
                       </article>
                     ))}
@@ -608,7 +675,7 @@ export default function Home() {
                 </div>
                 {board.notes.length ? (
                   <div className="notes-list">
-                    {board.notes.slice(0, 4).map((n) => <NoteCard key={n.id} note={n} />)}
+                    {board.notes.slice(0, 4).map((n) => <NoteCard key={n.id} note={n} canEdit onEdit={() => openPersonalNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deletePersonalNote", profile, noteId: n.id }); }} />)}
                   </div>
                 ) : (
                   <div className="notes-empty">
@@ -739,7 +806,7 @@ export default function Home() {
             <section className="notes-section">
               <div className="section-title"><div><h2>章节与共读笔记</h2></div></div>
               {viewGroupNotes.length ? (
-                <div className="notes-list">{viewGroupNotes.map((n) => <NoteCard key={n.id} note={n} shared />)}</div>
+                <div className="notes-list">{viewGroupNotes.map((n) => <NoteCard key={n.id} note={n} shared canEdit={isMyNote(n)} onEdit={() => openGroupNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deleteGroupNote", profile, noteId: n.id }); }} />)}</div>
               ) : (
                 <Empty
                   icon={<MessageCircle />}
@@ -825,12 +892,23 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="info-card">
+            <div className="info-card my-note-records">
               <BookHeart />
               <div>
-                <b>期次初始化（往期 31 期）</b>
-                <p>如果你希望强制刷新中文书单历史期次与“第 31 期”为当前期，可点下面按钮重新同步一次。</p>
-                <button className="text-button" onClick={() => act({ action: "seedHistory" })}>重建往期书单</button>
+                <b>我的笔记记录</b>
+                <p>这里会显示你自己写过的个人笔记和共读笔记。可以从这里回看、修改或删除。</p>
+                {board.notes.length || myGroupNotes.length ? (
+                  <div className="settings-note-list">
+                    {board.notes.map((n) => (
+                      <NoteCard key={n.id} note={n} canEdit onEdit={() => openPersonalNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deletePersonalNote", profile, noteId: n.id }); }} />
+                    ))}
+                    {myGroupNotes.map((n) => (
+                      <NoteCard key={n.id} note={n} shared canEdit onEdit={() => openGroupNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deleteGroupNote", profile, noteId: n.id }); }} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="quiet">现在还没有自己的笔记。</p>
+                )}
               </div>
             </div>
 
@@ -885,9 +963,9 @@ export default function Home() {
             <>
               <label>放到书架<select value={status} onChange={(e) => setStatus(e.target.value)}><option value="wish">想读</option><option value="reading">在读</option><option value="finished">已读</option></select></label>
               {status === "reading" && <label>当前进度 <b>{progress}%</b><input type="range" min="0" max="100" value={progress} onChange={(e) => setProgress(Number(e.target.value))} /></label>}
-              <button className="primary full" disabled={!book.title || loading} onClick={() => act({ action: "saveLibrary", profile, book, status, progress })}>
+              <button className="primary full" disabled={!book.title || loading} onClick={() => act({ action: "saveLibrary", profile, libraryId: editingLibraryId, book, status, progress })}>
                 {loading ? <LoaderCircle className="spin" /> : <Bookmark />}
-                保存到书架
+                {editingLibraryId ? "保存书架修改" : "保存到书架"}
               </button>
             </>
           )}
@@ -928,6 +1006,8 @@ export default function Home() {
               setQuote={setQuote}
               body={body}
               setBody={setBody}
+              imageUrl={noteImageUrl}
+              setImageUrl={setNoteImageUrl}
               chapters={chapters}
               title={selectedEntry?.title || ""}
               verify={() => verifyQuote(selectedEntry?.title || "")}
@@ -935,12 +1015,15 @@ export default function Home() {
           )}
 
           {modal === "note" && (
-            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act({ action: "personalNote", profile, bookId: selectedEntry.book_id, chapter, quote, body })}>保存个人笔记</button>
+            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act(editingPersonalNoteId ? { action: "updatePersonalNote", profile, noteId: editingPersonalNoteId, chapter, quote, body, imageUrl: noteImageUrl } : { action: "personalNote", profile, bookId: selectedEntry.book_id, chapter, quote, body, imageUrl: noteImageUrl })}>{editingPersonalNoteId ? "保存修改" : "保存个人笔记"}</button>
           )}
 
           {modal === "groupNote" && groupNoteTarget && (
-            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act({ action: "groupNote", profile, bookId: groupNoteTarget.bookId, cycleId: groupNoteTarget.cycleId, chapter, quote, body })}>
-              发布到共读区
+            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act(editingGroupNoteId
+              ? { action: "updateGroupNote", profile, noteId: editingGroupNoteId, chapter, quote, body, imageUrl: noteImageUrl }
+              : { action: "groupNote", profile, bookId: groupNoteTarget.bookId, cycleId: groupNoteTarget.cycleId, chapter, quote, body, imageUrl: noteImageUrl }
+            )}>
+              {editingGroupNoteId ? "保存修改" : "发布到共读区"}
             </button>
           )}
 
@@ -991,7 +1074,8 @@ function Empty({ icon, title, text, action }: { icon: React.ReactNode; title: st
   );
 }
 
-function NoteCard({ note, shared = false }: { note: any; shared?: boolean }) {
+function NoteCard({ note, shared = false, canEdit = false, onEdit, onDelete }: { note: any; shared?: boolean; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void }) {
+  const imageUrl = safeHttpUrl(note.image_url);
   return (
     <article className="note-card">
       <div className="note-meta">
@@ -1003,6 +1087,13 @@ function NoteCard({ note, shared = false }: { note: any; shared?: boolean }) {
       </div>
       {note.quote && <blockquote>“{note.quote}”</blockquote>}
       <p>{note.body}</p>
+      {imageUrl && <img className="note-image" src={imageUrl} alt="笔记配图" loading="lazy" />}
+      {canEdit && (
+        <div className="note-actions">
+          <button className="text-button tiny" onClick={onEdit}>编辑</button>
+          <button className="text-button tiny danger-link" onClick={onDelete}>删除</button>
+        </div>
+      )}
     </article>
   );
 }
@@ -1059,7 +1150,7 @@ function BookForm({ book, setBook, lookup, loading, message }: { book: BookDraft
   );
 }
 
-function NoteForm({ chapter, setChapter, quote, setQuote, body, setBody, chapters, title, verify }: { chapter: string; setChapter: (x: string) => void; quote: string; setQuote: (x: string) => void; body: string; setBody: (x: string) => void; chapters: string[]; title: string; verify: () => void }) {
+function NoteForm({ chapter, setChapter, quote, setQuote, body, setBody, imageUrl, setImageUrl, chapters, title, verify }: { chapter: string; setChapter: (x: string) => void; quote: string; setQuote: (x: string) => void; body: string; setBody: (x: string) => void; imageUrl: string; setImageUrl: (x: string) => void; chapters: string[]; title: string; verify: () => void }) {
   return (
     <>
       <label>
@@ -1075,8 +1166,22 @@ function NoteForm({ chapter, setChapter, quote, setQuote, body, setBody, chapter
         我的笔记
         <textarea className="tall" value={body} onChange={(e) => setBody(e.target.value)} placeholder={`关于《${title}》，此刻我想记下……`} autoFocus />
       </label>
+      <label>
+        笔记配图（可选）
+        <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="粘贴以 http:// 或 https:// 开头的图片链接" />
+      </label>
+      {safeHttpUrl(imageUrl) && <img className="note-image note-image-preview" src={safeHttpUrl(imageUrl)} alt="配图预览" />}
     </>
   );
+}
+
+function safeHttpUrl(value: unknown) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
 }
 
 function CycleForm({ loading, onSave, isEdit = false, eyebrow = "", title = "" }: { loading: boolean; onSave: (e: string, t: string) => void; isEdit?: boolean; eyebrow?: string; title?: string }) {
