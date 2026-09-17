@@ -108,6 +108,8 @@ svg { flex-shrink: 0; }
 .note-meta small { color: var(--muted); font-size: 12px; margin-top: 3px; }
 .note-card blockquote { margin: 23px 0 17px; font: 700 21px/1.7 var(--serif); color: var(--accent); overflow-wrap: anywhere; }
 .note-card > p { white-space: pre-wrap; font: 16px/1.95 var(--serif); margin: 0; max-width: 70ch; }
+.note-image { display: block; width: min(100%, 680px); max-height: 640px; margin-top: 18px; border-radius: 16px; object-fit: contain; background: #eef3fc; }
+.note-image-preview { max-height: 280px; margin: 0 auto 8px; }
 .journal-notes .notes-list { display: block; }
 .journal-notes .note-card { padding-bottom: 24px; }
 .journal-notes .note-meta small { color: #405779; }
