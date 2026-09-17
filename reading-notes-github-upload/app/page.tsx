@@ -157,6 +157,7 @@ export default function Home() {
   const [chapter, setChapter] = useState("");
   const [quote, setQuote] = useState("");
   const [body, setBody] = useState("");
+  const [noteImageUrl, setNoteImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [boardError, setBoardError] = useState("");
@@ -286,6 +287,7 @@ export default function Home() {
     setBody("");
     setQuote("");
     setChapter("");
+    setNoteImageUrl("");
   }
 
   function applyFallbackAction(payload: Record<string, unknown>) {
@@ -401,6 +403,7 @@ export default function Home() {
     setChapter(entry.current_chapter || "");
     setQuote("");
     setBody("");
+    setNoteImageUrl("");
     setGroupNoteTarget(null);
     setEditingGroupNoteId(null);
     setModal("note");
@@ -412,6 +415,7 @@ export default function Home() {
     setChapter(note.chapter || "");
     setQuote(note.quote || "");
     setBody(note.body || "");
+    setNoteImageUrl(note.image_url || "");
     setGroupNoteTarget(null);
     setEditingGroupNoteId(null);
     setModal("note");
@@ -444,6 +448,7 @@ export default function Home() {
     setChapter(entry.current_chapter || entry.chapter || "");
     setQuote("");
     setBody("");
+    setNoteImageUrl("");
     setModal("groupNote");
   }
 
@@ -454,6 +459,7 @@ export default function Home() {
     setChapter(note.chapter || "");
     setQuote(note.quote || "");
     setBody(note.body || "");
+    setNoteImageUrl(note.image_url || "");
     setModal("groupNote");
   }
 
@@ -1000,6 +1006,8 @@ export default function Home() {
               setQuote={setQuote}
               body={body}
               setBody={setBody}
+              imageUrl={noteImageUrl}
+              setImageUrl={setNoteImageUrl}
               chapters={chapters}
               title={selectedEntry?.title || ""}
               verify={() => verifyQuote(selectedEntry?.title || "")}
@@ -1007,13 +1015,13 @@ export default function Home() {
           )}
 
           {modal === "note" && (
-            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act(editingPersonalNoteId ? { action: "updatePersonalNote", profile, noteId: editingPersonalNoteId, chapter, quote, body } : { action: "personalNote", profile, bookId: selectedEntry.book_id, chapter, quote, body })}>{editingPersonalNoteId ? "保存修改" : "保存个人笔记"}</button>
+            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act(editingPersonalNoteId ? { action: "updatePersonalNote", profile, noteId: editingPersonalNoteId, chapter, quote, body, imageUrl: noteImageUrl } : { action: "personalNote", profile, bookId: selectedEntry.book_id, chapter, quote, body, imageUrl: noteImageUrl })}>{editingPersonalNoteId ? "保存修改" : "保存个人笔记"}</button>
           )}
 
           {modal === "groupNote" && groupNoteTarget && (
             <button className="primary full" disabled={!body.trim() || loading} onClick={() => act(editingGroupNoteId
-              ? { action: "updateGroupNote", profile, noteId: editingGroupNoteId, chapter, quote, body }
-              : { action: "groupNote", profile, bookId: groupNoteTarget.bookId, cycleId: groupNoteTarget.cycleId, chapter, quote, body }
+              ? { action: "updateGroupNote", profile, noteId: editingGroupNoteId, chapter, quote, body, imageUrl: noteImageUrl }
+              : { action: "groupNote", profile, bookId: groupNoteTarget.bookId, cycleId: groupNoteTarget.cycleId, chapter, quote, body, imageUrl: noteImageUrl }
             )}>
               {editingGroupNoteId ? "保存修改" : "发布到共读区"}
             </button>
@@ -1067,6 +1075,7 @@ function Empty({ icon, title, text, action }: { icon: React.ReactNode; title: st
 }
 
 function NoteCard({ note, shared = false, canEdit = false, onEdit, onDelete }: { note: any; shared?: boolean; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void }) {
+  const imageUrl = safeHttpUrl(note.image_url);
   return (
     <article className="note-card">
       <div className="note-meta">
@@ -1078,6 +1087,7 @@ function NoteCard({ note, shared = false, canEdit = false, onEdit, onDelete }: {
       </div>
       {note.quote && <blockquote>“{note.quote}”</blockquote>}
       <p>{note.body}</p>
+      {imageUrl && <img className="note-image" src={imageUrl} alt="笔记配图" loading="lazy" />}
       {canEdit && (
         <div className="note-actions">
           <button className="text-button tiny" onClick={onEdit}>编辑</button>
@@ -1140,7 +1150,7 @@ function BookForm({ book, setBook, lookup, loading, message }: { book: BookDraft
   );
 }
 
-function NoteForm({ chapter, setChapter, quote, setQuote, body, setBody, chapters, title, verify }: { chapter: string; setChapter: (x: string) => void; quote: string; setQuote: (x: string) => void; body: string; setBody: (x: string) => void; chapters: string[]; title: string; verify: () => void }) {
+function NoteForm({ chapter, setChapter, quote, setQuote, body, setBody, imageUrl, setImageUrl, chapters, title, verify }: { chapter: string; setChapter: (x: string) => void; quote: string; setQuote: (x: string) => void; body: string; setBody: (x: string) => void; imageUrl: string; setImageUrl: (x: string) => void; chapters: string[]; title: string; verify: () => void }) {
   return (
     <>
       <label>
@@ -1156,8 +1166,22 @@ function NoteForm({ chapter, setChapter, quote, setQuote, body, setBody, chapter
         我的笔记
         <textarea className="tall" value={body} onChange={(e) => setBody(e.target.value)} placeholder={`关于《${title}》，此刻我想记下……`} autoFocus />
       </label>
+      <label>
+        笔记配图（可选）
+        <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="粘贴以 http:// 或 https:// 开头的图片链接" />
+      </label>
+      {safeHttpUrl(imageUrl) && <img className="note-image note-image-preview" src={safeHttpUrl(imageUrl)} alt="配图预览" />}
     </>
   );
+}
+
+function safeHttpUrl(value: unknown) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
 }
 
 function CycleForm({ loading, onSave, isEdit = false, eyebrow = "", title = "" }: { loading: boolean; onSave: (e: string, t: string) => void; isEdit?: boolean; eyebrow?: string; title?: string }) {
