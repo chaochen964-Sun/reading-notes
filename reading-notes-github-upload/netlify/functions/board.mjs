@@ -303,14 +303,15 @@ async function handlePost(req) {
     else board.library.push(entry);
   } else if (data.action === "personalNote") {
     const book = board.books.find((item) => item.id === data.bookId) || {};
-    board.notes.unshift({ id: `note-${id()}`, title: book.title || "", ...data, image_url: data.imageUrl || "", book_id: data.bookId, device_id: data.profile.deviceId, display_name: data.profile.name, avatar: data.profile.avatar, created_at: now() });
+    board.notes.unshift({ id: `note-${id()}`, title: book.title || "", ...data, image_url: data.imageUrl || "", is_public: data.isPublic === true, book_id: data.bookId, device_id: data.profile.deviceId, display_name: data.profile.name, avatar: data.profile.avatar, created_at: now() });
   } else if (data.action === "updatePersonalNote") {
     const index = board.notes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
     if (index < 0) return json({ error: "只能修改自己的个人笔记" }, 404);
-    board.notes[index] = { ...board.notes[index], device_id: data.profile.deviceId, chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", image_url: data.imageUrl || "", display_name: data.profile.name, avatar: data.profile.avatar };
+    board.notes[index] = { ...board.notes[index], device_id: data.profile.deviceId, chapter: data.chapter || "", quote: data.quote || "", body: data.body || "", image_url: data.imageUrl || "", is_public: data.isPublic === true, display_name: data.profile.name, avatar: data.profile.avatar };
   } else if (data.action === "deletePersonalNote") {
     const index = board.notes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
     if (index < 0) return json({ error: "只能删除自己的个人笔记" }, 404);
+    board.replies = (board.replies || []).filter((reply) => reply.note_id !== data.noteId);
     board.notes.splice(index, 1);
   } else if (data.action === "groupNote") {
     const book = board.books.find((item) => item.id === data.bookId) || {};
@@ -322,7 +323,16 @@ async function handlePost(req) {
   } else if (data.action === "deleteGroupNote") {
     const index = board.groupNotes.findIndex((note) => note.id === data.noteId && ownsNote(note, data.profile));
     if (index < 0) return json({ error: "只能删除自己写的共读笔记" }, 404);
+    board.replies = (board.replies || []).filter((reply) => reply.note_id !== data.noteId);
     board.groupNotes.splice(index, 1);
+  } else if (data.action === "addReply") {
+    const body = String(data.body || "").trim();
+    const profile = data.profile;
+    if (!profile?.deviceId || !profile?.name || !body || body.length > 2000) return json({ error: "回复需要昵称和不超过 2000 字的内容" }, 400);
+    const note = board.groupNotes.find((item) => item.id === data.noteId) || board.notes.find((item) => item.id === data.noteId && item.is_public === true);
+    if (!note) return json({ error: "这则笔记不存在或未公开" }, 404);
+    board.replies ||= [];
+    board.replies.push({ id: `reply-${id()}`, note_id: note.id, device_id: profile.deviceId, display_name: profile.name, avatar: profile.avatar || "", body, created_at: now() });
   } else if (data.action === "nominate") {
     const book = upsertBook(board, data.book);
     const nominee = { id: `nominee-${id()}`, cycle_id: data.cycleId, ...nomineeBookFields(book), note: data.note || "", created_at: now() };
@@ -371,6 +381,7 @@ async function handleRequest(req) {
     const params = new URL(req.url).searchParams;
     const deviceId = params.get("deviceId") || "";
     const name = params.get("name") || "";
+    board.publicNotes = (board.notes || []).filter((note) => note.is_public === true).map((note) => ({ id: note.id, book_id: note.book_id, title: note.title, display_name: note.display_name, avatar: note.avatar, chapter: note.chapter, quote: note.quote, body: note.body, image_url: note.image_url, created_at: note.created_at }));
     if (deviceId) {
       board.library = (board.library || []).filter((entry) => entry.device_id === deviceId);
       board.notes = (board.notes || []).filter((note) => ownsNote(note, { deviceId, name }));
@@ -378,6 +389,8 @@ async function handleRequest(req) {
       board.library = [];
       board.notes = [];
     }
+    const visibleNoteIds = new Set([...board.groupNotes, ...board.publicNotes, ...board.notes].map((note) => note.id));
+    board.replies = (board.replies || []).filter((reply) => visibleNoteIds.has(reply.note_id)).map((reply) => ({ id: reply.id, note_id: reply.note_id, display_name: reply.display_name, avatar: reply.avatar, body: reply.body, created_at: reply.created_at }));
     return json(board);
   }
   if (req.method === "POST") return handlePost(req);
