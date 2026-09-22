@@ -197,6 +197,23 @@ svg { flex-shrink: 0; }
 .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .button-row.compact { display: flex; flex-wrap: wrap; gap: 12px; margin-top: auto; }
 .note-actions { display: flex; flex-direction: row; gap: 14px; margin-top: 14px; }
+.note-visibility { display: block; margin-top: 12px; color: var(--muted); }
+.reply-thread { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+.reply-item { display: grid; gap: 2px; margin: 0 0 12px; font-size: 14px; white-space: pre-wrap; }
+.reply-item b { color: var(--accent); font-size: 13px; }
+.reply-compose { display: flex; gap: 8px; align-items: center; }
+.reply-compose input { min-width: 0; flex: 1; min-height: 44px; padding: 9px 12px; border: 1px solid #a6b4ce; border-radius: 8px; background: #fff; }
+.reply-compose .outline { flex-shrink: 0; }
+.reply-error { color: #a32c22; }
+.book-discussion .note-card { padding: 20px 0; }
+.book-discussion .quiet { margin: 0 0 16px; }
+.share-note-option { display: flex!important; align-items: center; gap: 10px; }
+.share-note-option input { width: 18px; height: 18px; min-height: 0; margin: 0; accent-color: var(--accent); }
+.catalog-results { max-height: 225px; overflow: auto; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.catalog-results button { display: flex; flex-direction: column; align-items: flex-start; width: 100%; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--line); background: #fff; text-align: left; }
+.catalog-results button:hover, .catalog-results button:focus-visible { background: var(--blue); }
+.catalog-results small { color: var(--muted); font-weight: 400; }
+.catalog-results p { margin: 10px 12px; font-weight: 400; color: var(--muted); }
 .danger-link { color: #b13b2f; }
 .settings-note-list { margin-top: 14px; }
 .settings-note-list .note-card { max-width: 760px; }

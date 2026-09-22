@@ -6,7 +6,7 @@ import { BookHeart, BookOpen, Bookmark, Check, ChevronRight, Library, LoaderCirc
 
 type Profile = { deviceId: string; name: string; avatar: string };
 type BookDraft = { isbn: string; title: string; authors: string; publisher: string; publishedDate: string; coverUrl: string; podcastUrl: string; chapters: string[] };
-type Board = { books: any[]; library: any[]; notes: any[]; cycles: any[]; nominees: any[]; groupNotes: any[] };
+type Board = { books: any[]; library: any[]; notes: any[]; publicNotes: any[]; replies: any[]; cycles: any[]; nominees: any[]; groupNotes: any[] };
 type GroupNoteTarget = { cycleId: string; bookId: string };
 
 const blank: BookDraft = { isbn: "", title: "", authors: "", publisher: "", publishedDate: "", coverUrl: "", podcastUrl: "", chapters: [] };
@@ -103,7 +103,7 @@ function baseFallbackBoard(): Board {
     note: publisher || "本期推荐",
     created_at: 31 + i,
   }));
-  return { books: [], library: [], notes: [], cycles, nominees: [...historyNominees, ...currentNominees], groupNotes: [] };
+  return { books: [], library: [], notes: [], publicNotes: [], replies: [], cycles, nominees: [...historyNominees, ...currentNominees], groupNotes: [] };
 }
 
 function fallbackBoard(): Board {
@@ -118,6 +118,8 @@ function fallbackBoard(): Board {
       books: [],
       library: [],
       notes: [],
+      publicNotes: [],
+      replies: [],
       cycles: parsed.cycles?.length ? parsed.cycles : base.cycles,
       nominees: parsed.nominees?.length ? parsed.nominees : base.nominees,
       groupNotes: parsed.groupNotes || [],
@@ -142,10 +144,10 @@ export default function Home() {
   const [profileReady, setProfileReady] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [draftProfile, setDraftProfile] = useState({ name: "", avatar: "☁️" });
-  const [board, setBoard] = useState<Board>({ books: [], library: [], notes: [], cycles: [], nominees: [], groupNotes: [] });
+  const [board, setBoard] = useState<Board>({ books: [], library: [], notes: [], publicNotes: [], replies: [], cycles: [], nominees: [], groupNotes: [] });
   const [tab, setTab] = useState<"mine" | "club" | "settings">("mine");
   const [filter, setFilter] = useState("reading");
-  const [modal, setModal] = useState<null | "book" | "note" | "nominate" | "groupNote" | "cycle" | "summary">(null);
+  const [modal, setModal] = useState<null | "book" | "note" | "nominate" | "groupNote" | "cycle" | "summary" | "bookDiscussion">(null);
   const [editingNomineeId, setEditingNomineeId] = useState<string | null>(null);
   const [editingNomineeCycleId, setEditingNomineeCycleId] = useState<string | null>(null);
   const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null);
@@ -158,6 +160,8 @@ export default function Home() {
   const [quote, setQuote] = useState("");
   const [body, setBody] = useState("");
   const [noteImageUrl, setNoteImageUrl] = useState("");
+  const [noteIsPublic, setNoteIsPublic] = useState(false);
+  const [discussionBook, setDiscussionBook] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [boardError, setBoardError] = useState("");
@@ -288,6 +292,7 @@ export default function Home() {
     setQuote("");
     setChapter("");
     setNoteImageUrl("");
+    setDiscussionBook(null);
   }
 
   function applyFallbackAction(payload: Record<string, unknown>) {
@@ -369,7 +374,7 @@ export default function Home() {
     return true;
   }
 
-  async function act(payload: Record<string, unknown>) {
+  async function act(payload: Record<string, unknown>, keepModal = false) {
     setLoading(true);
     setMessage("");
 
@@ -393,8 +398,14 @@ export default function Home() {
     }
 
     await refresh();
-    finishAction();
+    if (!keepModal) finishAction();
     return true;
+  }
+
+  function sameBook(note: any, entry: any) {
+    if (note.book_id === entry.book_id) return true;
+    const noteBook = board.books.find((item) => item.id === note.book_id);
+    return Boolean(noteBook?.isbn && entry.isbn && !String(entry.isbn).startsWith("manual-") && noteBook.isbn === entry.isbn);
   }
 
   function openNote(entry: any) {
@@ -404,6 +415,7 @@ export default function Home() {
     setQuote("");
     setBody("");
     setNoteImageUrl("");
+    setNoteIsPublic(false);
     setGroupNoteTarget(null);
     setEditingGroupNoteId(null);
     setModal("note");
@@ -416,6 +428,7 @@ export default function Home() {
     setQuote(note.quote || "");
     setBody(note.body || "");
     setNoteImageUrl(note.image_url || "");
+    setNoteIsPublic(note.is_public === true);
     setGroupNoteTarget(null);
     setEditingGroupNoteId(null);
     setModal("note");
@@ -653,6 +666,7 @@ export default function Home() {
                           )}
                           <div className="button-row compact">
                             <button className="text-button" onClick={() => openNote(entry)}>写笔记 <ChevronRight size={16} /></button>
+                            <button className="text-button" onClick={() => { setDiscussionBook(entry); setModal("bookDiscussion"); }}>书友笔记</button>
                             <button className="text-button" onClick={() => openLibraryEditor(entry)}>编辑书目</button>
                           </div>
                         </div>
@@ -663,7 +677,7 @@ export default function Home() {
                   <Empty
                     icon={<Library />}
                     title={`“${statusLabel[filter]}”书架还是空的`}
-                    text="用 ISBN 找到一本书，或直接手动填写。"
+                    text="按书名或 ISBN 找书，也可以手动填写。"
                     action={() => setModal("book")}
                   />
                 )}
@@ -675,7 +689,7 @@ export default function Home() {
                 </div>
                 {board.notes.length ? (
                   <div className="notes-list">
-                    {board.notes.slice(0, 4).map((n) => <NoteCard key={n.id} note={n} canEdit onEdit={() => openPersonalNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deletePersonalNote", profile, noteId: n.id }); }} />)}
+                    {board.notes.slice(0, 4).map((n) => <NoteCard key={n.id} note={n} canEdit replies={(board.replies || []).filter((reply) => reply.note_id === n.id)} onReply={n.is_public ? (reply) => profile ? act({ action: "addReply", profile, noteId: n.id, body: reply }, true) : Promise.resolve(false) : undefined} onEdit={() => openPersonalNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deletePersonalNote", profile, noteId: n.id }); }} />)}
                   </div>
                 ) : (
                   <div className="notes-empty">
@@ -806,7 +820,7 @@ export default function Home() {
             <section className="notes-section">
               <div className="section-title"><div><h2>章节与共读笔记</h2></div></div>
               {viewGroupNotes.length ? (
-                <div className="notes-list">{viewGroupNotes.map((n) => <NoteCard key={n.id} note={n} shared canEdit={isMyNote(n)} onEdit={() => openGroupNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deleteGroupNote", profile, noteId: n.id }); }} />)}</div>
+                <div className="notes-list">{viewGroupNotes.map((n) => <NoteCard key={n.id} note={n} shared canEdit={isMyNote(n)} replies={(board.replies || []).filter((reply) => reply.note_id === n.id)} onReply={(reply) => profile ? act({ action: "addReply", profile, noteId: n.id, body: reply }, true) : Promise.resolve(false)} onEdit={() => openGroupNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deleteGroupNote", profile, noteId: n.id }); }} />)}</div>
               ) : (
                 <Empty
                   icon={<MessageCircle />}
@@ -900,10 +914,10 @@ export default function Home() {
                 {board.notes.length || myGroupNotes.length ? (
                   <div className="settings-note-list">
                     {board.notes.map((n) => (
-                      <NoteCard key={n.id} note={n} canEdit onEdit={() => openPersonalNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deletePersonalNote", profile, noteId: n.id }); }} />
+                      <NoteCard key={n.id} note={n} canEdit replies={(board.replies || []).filter((reply) => reply.note_id === n.id)} onReply={n.is_public ? (reply) => profile ? act({ action: "addReply", profile, noteId: n.id, body: reply }, true) : Promise.resolve(false) : undefined} onEdit={() => openPersonalNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deletePersonalNote", profile, noteId: n.id }); }} />
                     ))}
                     {myGroupNotes.map((n) => (
-                      <NoteCard key={n.id} note={n} shared canEdit onEdit={() => openGroupNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deleteGroupNote", profile, noteId: n.id }); }} />
+                      <NoteCard key={n.id} note={n} shared canEdit replies={(board.replies || []).filter((reply) => reply.note_id === n.id)} onReply={(reply) => profile ? act({ action: "addReply", profile, noteId: n.id, body: reply }, true) : Promise.resolve(false)} onEdit={() => openGroupNoteEditor(n)} onDelete={() => { if (profile) void act({ action: "deleteGroupNote", profile, noteId: n.id }); }} />
                     ))}
                   </div>
                 ) : (
@@ -956,7 +970,18 @@ export default function Home() {
               lookup={lookup}
               loading={loading}
               message={message}
+              existingBooks={modal === "book" && !editingLibraryId ? board.books : []}
             />
+          )}
+
+          {modal === "bookDiscussion" && discussionBook && (
+            <div className="book-discussion">
+              <p className="quiet">《{discussionBook.title}》的公开笔记与共读笔记。旧的个人笔记只有作者选择公开后才会出现。</p>
+              {(() => {
+                const notes = [...(board.publicNotes || []), ...board.groupNotes].filter((note) => sameBook(note, discussionBook)).sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0));
+                return notes.length ? notes.map((note) => <NoteCard key={note.id} note={note} shared replies={(board.replies || []).filter((reply) => reply.note_id === note.id)} onReply={(reply) => profile ? act({ action: "addReply", profile, noteId: note.id, body: reply }, true) : Promise.resolve(false)} />) : <p className="quiet">还没有公开笔记。你可以先写一则，并选择公开给书友。</p>;
+              })()}
+            </div>
           )}
 
           {modal === "book" && (
@@ -1015,7 +1040,10 @@ export default function Home() {
           )}
 
           {modal === "note" && (
-            <button className="primary full" disabled={!body.trim() || loading} onClick={() => act(editingPersonalNoteId ? { action: "updatePersonalNote", profile, noteId: editingPersonalNoteId, chapter, quote, body, imageUrl: noteImageUrl } : { action: "personalNote", profile, bookId: selectedEntry.book_id, chapter, quote, body, imageUrl: noteImageUrl })}>{editingPersonalNoteId ? "保存修改" : "保存个人笔记"}</button>
+            <>
+              <label className="share-note-option"><input type="checkbox" checked={noteIsPublic} onChange={(event) => setNoteIsPublic(event.target.checked)} />公开给同书读者，可收到回复</label>
+              <button className="primary full" disabled={!body.trim() || loading} onClick={() => act(editingPersonalNoteId ? { action: "updatePersonalNote", profile, noteId: editingPersonalNoteId, chapter, quote, body, imageUrl: noteImageUrl, isPublic: noteIsPublic } : { action: "personalNote", profile, bookId: selectedEntry.book_id, chapter, quote, body, imageUrl: noteImageUrl, isPublic: noteIsPublic })}>{editingPersonalNoteId ? "保存修改" : "保存个人笔记"}</button>
+            </>
           )}
 
           {modal === "groupNote" && groupNoteTarget && (
@@ -1074,8 +1102,19 @@ function Empty({ icon, title, text, action }: { icon: React.ReactNode; title: st
   );
 }
 
-function NoteCard({ note, shared = false, canEdit = false, onEdit, onDelete }: { note: any; shared?: boolean; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void }) {
+function NoteCard({ note, shared = false, canEdit = false, replies = [], onReply, onEdit, onDelete }: { note: any; shared?: boolean; canEdit?: boolean; replies?: any[]; onReply?: (body: string) => Promise<boolean>; onEdit?: () => void; onDelete?: () => void }) {
   const imageUrl = safeHttpUrl(note.image_url);
+  const [reply, setReply] = useState("");
+  const [replyError, setReplyError] = useState("");
+  const [replying, setReplying] = useState(false);
+  async function sendReply() {
+    if (!reply.trim() || !onReply) return;
+    setReplying(true);
+    const saved = await onReply(reply.trim());
+    setReplying(false);
+    if (saved) { setReply(""); setReplyError(""); }
+    else setReplyError("回复未保存，请稍后重试。");
+  }
   return (
     <article className="note-card">
       <div className="note-meta">
@@ -1088,10 +1127,18 @@ function NoteCard({ note, shared = false, canEdit = false, onEdit, onDelete }: {
       {note.quote && <blockquote>“{note.quote}”</blockquote>}
       <p>{note.body}</p>
       {imageUrl && <img className="note-image" src={imageUrl} alt="笔记配图" loading="lazy" />}
+      {canEdit && !shared && <small className="note-visibility">{note.is_public ? "已公开给书友" : "仅自己可见"}</small>}
       {canEdit && (
         <div className="note-actions">
           <button className="text-button tiny" onClick={onEdit}>编辑</button>
           <button className="text-button tiny danger-link" onClick={onDelete}>删除</button>
+        </div>
+      )}
+      {(onReply || replies.length > 0) && (
+        <div className="reply-thread">
+          {replies.map((item) => <p className="reply-item" key={item.id}><b>{item.avatar} {item.display_name}</b><span>{item.body}</span></p>)}
+          {onReply && <div className="reply-compose"><input aria-label={`回复${note.display_name || "这则笔记"}`} value={reply} maxLength={2000} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void sendReply(); }} placeholder="写下你的回复…" /><button className="outline" disabled={!reply.trim() || replying} onClick={() => void sendReply()}>{replying ? "发送中" : "回复"}</button></div>}
+          {replyError && <small role="alert" className="reply-error">{replyError}</small>}
         </div>
       )}
     </article>
@@ -1118,13 +1165,20 @@ function modalTitle(x: string) {
     note: "写一则个人笔记",
     nominate: "推选一本书",
     groupNote: "写共读笔记",
+    bookDiscussion: "书友笔记",
     summary: "编辑讨论小结",
   } as Record<string, string>)[x];
 }
 
-function BookForm({ book, setBook, lookup, loading, message }: { book: BookDraft; setBook: (b: BookDraft) => void; lookup: () => void; loading: boolean; message: string }) {
+function BookForm({ book, setBook, lookup, loading, message, existingBooks = [] }: { book: BookDraft; setBook: (b: BookDraft) => void; lookup: () => void; loading: boolean; message: string; existingBooks?: any[] }) {
+  const [titleSearch, setTitleSearch] = useState("");
+  const query = titleSearch.normalize("NFKC").trim().toLocaleLowerCase();
+  const matches = query ? existingBooks.filter((item) => String(item.title || "").normalize("NFKC").toLocaleLowerCase().includes(query)).slice(0, 8) : [];
   return (
     <>
+      {existingBooks.length > 0 && <label>按书名找已有书目<input type="search" value={titleSearch} onChange={(event) => setTitleSearch(event.target.value)} placeholder="输入中文或英文书名" />
+        {query && <div className="catalog-results">{matches.length ? matches.map((item) => <button type="button" key={item.id} onClick={() => { setBook({ isbn: item.isbn || "", title: item.title || "", authors: item.authors || "", publisher: item.publisher || "", publishedDate: item.published_date || "", coverUrl: item.cover_url || "", podcastUrl: item.podcast_url || "", chapters: (() => { try { return JSON.parse(item.chapters_json || "[]"); } catch { return []; } })() }); setTitleSearch(""); }}><b>{item.title}</b><small>{item.authors || item.publisher || "已有书目"}</small></button>) : <p>没有匹配的已有书目，可继续用 ISBN 搜索或手动填写。</p>}</div>}
+      </label>}
       <label>
         ISBN
         <div className="search-row">
