@@ -144,6 +144,9 @@ export default function Home() {
   const [profileReady, setProfileReady] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [draftProfile, setDraftProfile] = useState({ name: "", avatar: "☁️" });
+  const [syncCode, setSyncCode] = useState("");
+  const [syncMessage, setSyncMessage] = useState("");
+  const [syncLoading, setSyncLoading] = useState(false);
   const [board, setBoard] = useState<Board>({ books: [], library: [], notes: [], publicNotes: [], replies: [], cycles: [], nominees: [], groupNotes: [] });
   const [tab, setTab] = useState<"mine" | "club" | "settings">("mine");
   const [filter, setFilter] = useState("reading");
@@ -181,6 +184,14 @@ export default function Home() {
 
   useEffect(() => {
     if (profile) refresh(profile.deviceId, profile.name);
+  }, [profile]);
+
+  useEffect(() => {
+    if (!profile) return;
+    const reload = () => { if (!document.hidden) void refresh(profile.deviceId, profile.name); };
+    window.addEventListener("focus", reload);
+    const timer = window.setInterval(reload, 30000);
+    return () => { window.removeEventListener("focus", reload); window.clearInterval(timer); };
   }, [profile]);
 
   const cycles = useMemo(() => cleanCycles(board.cycles || []), [board.cycles]);
@@ -256,6 +267,32 @@ export default function Home() {
     localStorage.setItem("f2f-reading-profile", JSON.stringify(next));
     setProfile(next);
     setEditingProfile(false);
+  }
+
+  async function connectDevice() {
+    if (!profile) return;
+    const target = syncCode.trim();
+    if (target === profile.deviceId) { setSyncMessage("这台设备已经在使用这个同步码。"); return; }
+    setSyncLoading(true);
+    setSyncMessage("");
+    try {
+      const response = await fetch("/api/board", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "linkDevice", profile, targetDeviceId: target }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "连接失败，请稍后重试");
+      const next = { ...profile, deviceId: target };
+      localStorage.setItem("f2f-reading-profile", JSON.stringify(next));
+      setProfile(next);
+      setSyncCode("");
+      setSyncMessage("已连接。两台设备现在共用同一份书架，原有内容已保留。");
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : "连接失败，请稍后重试");
+    } finally {
+      setSyncLoading(false);
+    }
   }
 
   async function lookup() {
@@ -898,6 +935,20 @@ export default function Home() {
               </div>
             </div>
 
+            <div className="info-card sync-card">
+              <Users />
+              <div>
+                <b>电脑与手机同步</b>
+                <p>同名昵称不会自动连接书架。在已有书架的设备复制下方同步码，到另一台设备的这里粘贴并连接。两边已有内容会合在一起。</p>
+                <label htmlFor="my-sync-code">本设备同步码</label>
+                <div className="sync-row"><input id="my-sync-code" value={profile?.deviceId || ""} readOnly onFocus={(event) => event.target.select()} /><button className="outline" onClick={() => { void navigator.clipboard.writeText(profile?.deviceId || "").then(() => setSyncMessage("同步码已复制。请只在自己的设备上使用。"), () => setSyncMessage("复制失败，可以选中上方代码手动复制。")); }}>复制</button></div>
+                <label htmlFor="other-sync-code">连接已有书架</label>
+                <div className="sync-row"><input id="other-sync-code" value={syncCode} onChange={(event) => setSyncCode(event.target.value)} placeholder="粘贴另一台设备的同步码" autoComplete="off" /><button className="primary" disabled={!syncCode.trim() || syncLoading} onClick={() => void connectDevice()}>{syncLoading ? "连接中" : "连接"}</button></div>
+                {syncMessage && <p className="sync-message" role="status">{syncMessage}</p>}
+                <small>同步码相当于书架钥匙，请勿公开分享。</small>
+              </div>
+            </div>
+
             <div className="info-card">
               <Bookmark />
               <div>
@@ -948,7 +999,7 @@ export default function Home() {
             <div className="welcome-form">
               {editingProfile && <button className="icon-button welcome-close" onClick={() => setEditingProfile(false)} aria-label="关闭"><X /></button>}
               <h2 id="welcome-title">先留下一个<br />阅读名字。</h2>
-              <p>不注册账号，只用昵称和头像认出彼此。</p>
+              <p>不注册账号，昵称和头像用来认出彼此。跨设备书架可在设置中连接。</p>
               <label>昵称<input value={draftProfile.name} onChange={(e) => setDraftProfile({ ...draftProfile, name: e.target.value })} placeholder="例如：一叶、Mia、蓝莓" autoFocus /></label>
               <div className="avatar-pick">
                 {avatars.map((a) => (

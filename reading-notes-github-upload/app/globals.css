@@ -172,6 +172,13 @@ svg { flex-shrink: 0; }
 .settings-card h2 { font: 700 30px var(--serif); margin: 0; }
 .settings-card p, .info-card p { color: var(--muted); font-size: 16px; line-height: 1.8; }
 .info-card > svg { width: 35px; height: 35px; color: var(--accent); }
+.sync-card > div { flex: 1; min-width: 0; }
+.sync-card label { display: block; margin: 15px 0 7px; font-size: 14px; font-weight: 650; }
+.sync-row { display: flex; gap: 8px; }
+.sync-row input { flex: 1; min-width: 0; min-height: 44px; padding: 9px 12px; border: 1px solid #a6b4ce; border-radius: 8px; background: #fff; color: var(--ink); }
+.sync-row button { flex-shrink: 0; }
+.sync-card small { display: block; margin-top: 14px; color: var(--muted); }
+.sync-card .sync-message { margin: 10px 0 0; color: var(--accent); font-size: 14px; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 100; background: #15274b73; display: grid; place-items: center; padding: 24px; overflow: auto; }
 .modal { width: min(590px,100%); max-height: calc(100dvh - 48px); overflow: auto; background: white; padding: 32px; border-radius: 14px; box-shadow: 0 24px 80px #13234740; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
