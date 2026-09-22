@@ -275,7 +275,20 @@ async function handlePost(req) {
   const board = await loadBoard();
   const data = await req.json();
 
-  if (data.action === "saveLibrary") {
+  if (data.action === "linkDevice") {
+    const source = String(data.profile?.deviceId || "");
+    const target = String(data.targetDeviceId || "").trim();
+    const validId = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+    if (!validId.test(source) || !validId.test(target)) return json({ error: "同步码不正确，请复制完整的 36 位代码" }, 400);
+    if (source === target) return json({ ok: true });
+    for (const collection of [board.library, board.notes, board.groupNotes, board.replies || []]) {
+      for (const item of collection) {
+        if (item.device_id !== source && item.profile?.deviceId !== source) continue;
+        item.device_id = target;
+        if (item.profile) item.profile.deviceId = target;
+      }
+    }
+  } else if (data.action === "saveLibrary") {
     const book = upsertBook(board, data.book);
     const ownLibrary = (entry) => entry.device_id === data.profile.deviceId;
     let existingIndex = board.library.findIndex((entry) => ownLibrary(entry) && data.libraryId && entry.id === data.libraryId);
