@@ -269,3 +269,16 @@ svg { flex-shrink: 0; }
   .welcome-form > p { margin: 12px 0 22px; } .button-row { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms!important; animation-iteration-count: 1!important; transition-duration: .01ms!important; } }
+
+.meeting-pdfs { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line, #d2dbea); }
+.meeting-pdfs h3 { font: inherit; font-weight: 700; margin: 0 0 8px; }
+.summary-card .meeting-pdf-help, .summary-card .meeting-pdf-status { font: inherit; font-size: 14px; line-height: 1.6; margin: 8px 0 14px; }
+.meeting-pdfs ul { list-style: none; margin: 12px 0 16px; padding: 0; }
+.meeting-pdfs li { padding: 10px 0; }
+.meeting-pdfs a { color: var(--accent, #254cda); overflow-wrap: anywhere; text-underline-offset: 4px; }
+.meeting-pdfs a span { display: block; font-size: 13px; margin-top: 4px; }
+.meeting-pdf-upload { display: inline-flex; position: relative; padding: 10px 14px; border: 1px solid currentColor; border-radius: 6px; color: var(--accent, #254cda); cursor: pointer; font-size: 14px; font-weight: 600; }
+.meeting-pdf-upload:hover { background: #dce8ff; }
+.meeting-pdf-upload:focus-within { outline: 2px solid var(--accent, #254cda); outline-offset: 3px; }
+.meeting-pdf-upload:has(input:disabled) { opacity: .55; cursor: wait; }
+.meeting-pdf-upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: inherit; }

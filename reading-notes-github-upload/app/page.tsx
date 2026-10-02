@@ -147,6 +147,8 @@ export default function Home() {
   const [syncCode, setSyncCode] = useState("");
   const [syncMessage, setSyncMessage] = useState("");
   const [syncLoading, setSyncLoading] = useState(false);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfMessage, setPdfMessage] = useState<{ cycleId: string; text: string } | null>(null);
   const [board, setBoard] = useState<Board>({ books: [], library: [], notes: [], publicNotes: [], replies: [], cycles: [], nominees: [], groupNotes: [] });
   const [tab, setTab] = useState<"mine" | "club" | "settings">("mine");
   const [filter, setFilter] = useState("reading");
@@ -259,6 +261,47 @@ export default function Home() {
       setBoard(fallbackBoard());
       setBoardError(data.error ? `正在显示公共书单；线上同步暂时返回：${data.error}` : "正在显示公共书单；线上同步暂时没有返回共读数据。");
     }
+  }
+
+  async function uploadMeetingPdf(file: File, cycleId: string) {
+    if (!profile) return;
+    if (!/\.pdf$/i.test(file.name) || !file.size || file.size > 10 * 1024 * 1024) {
+      setPdfMessage({ cycleId, text: "请选择不超过 10 MB 的 PDF 文件。" });
+      return;
+    }
+    setPdfUploading(true);
+    setPdfMessage({ cycleId, text: `正在上传 ${file.name}…` });
+    try {
+      if (await file.slice(0, 5).text() !== "%PDF-") throw new Error("请选择有效的 PDF 文件。");
+      const prepare = await fetch("/api/board", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "prepareMeetingPdf", profile, cycleId, name: file.name, size: file.size }) });
+      const ticket = await prepare.json() as { error?: string; uploadUrl: string; attachmentId: string };
+      if (!prepare.ok) throw new Error(ticket.error || "暂时无法开始上传。");
+      const uploaded = await fetch(ticket.uploadUrl, { method: "PUT", headers: { "content-type": "application/pdf" }, body: file });
+      if (!uploaded.ok) throw new Error("PDF 上传失败，请检查网络后重试。");
+      const response = await fetch("/api/board", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "completeMeetingPdf", profile, cycleId, attachmentId: ticket.attachmentId }) });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "保存附件失败，请重试。");
+      setPdfMessage({ cycleId, text: "上传成功，本期读者都可以打开这份会议记录。" });
+      await refresh();
+    } catch (error) {
+      setPdfMessage({ cycleId, text: error instanceof Error ? error.message : "上传失败，请稍后重试。" });
+    } finally {
+      setPdfUploading(false);
+    }
+  }
+
+  async function deleteMeetingPdf(attachmentId: string, cycleId: string) {
+    if (!profile || !window.confirm("删除这份会议记录？删除后可以上传新的 PDF。")) return;
+    setPdfUploading(true);
+    try {
+      const response = await fetch("/api/board", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "deleteMeetingPdf", profile, cycleId, attachmentId }) });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "删除失败，请重试。");
+      await refresh();
+      setPdfMessage({ cycleId, text: "已删除，可以上传新的会议记录。" });
+    } catch (error) {
+      setPdfMessage({ cycleId, text: error instanceof Error ? error.message : "删除失败，请重试。" });
+    } finally { setPdfUploading(false); }
   }
 
   function saveProfile() {
@@ -816,6 +859,25 @@ export default function Home() {
                   <div><Sparkles /><b>本期讨论小结</b></div>
                   <p>{viewCycle?.summary || "讨论结束后，把共同抵达的地方写在这里。"}</p>
                   <button className="text-button" onClick={() => { setBody(viewCycle?.summary || ""); setModal("summary"); }}>编辑小结 <ChevronRight size={16} /></button>
+                  <section className="meeting-pdfs" aria-label="本期会议记录 PDF">
+                    <h3>会议记录 PDF</h3>
+                    <p className="meeting-pdf-help">上传后，大家都能查看。每期一份，最大 10 MB。上传者可删除后重新上传。</p>
+                    {(viewCycle?.meeting_pdfs || []).length > 0 && <ul>
+                      {viewCycle.meeting_pdfs.map((pdf: any) => <li key={pdf.id}>
+                        <a href={`/api/board?meetingPdf=${encodeURIComponent(pdf.id)}`} target="_blank" rel="noopener noreferrer">{pdf.name} <span>打开 PDF ↗</span></a>
+                        {(!pdf.device_id || pdf.device_id === profile?.deviceId) && <button type="button" className="text-button" disabled={pdfUploading} onClick={() => void deleteMeetingPdf(pdf.id, viewCycle.id)}>删除 PDF</button>}
+                      </li>)}
+                    </ul>}
+                    {!(viewCycle?.meeting_pdfs || []).length && <label className="meeting-pdf-upload">
+                      {pdfUploading ? "正在上传…" : "上传会议记录 PDF"}
+                      <input type="file" accept="application/pdf,.pdf" disabled={pdfUploading || !viewCycle?.id || !!boardError} aria-label="上传会议记录 PDF" onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file && viewCycle?.id) void uploadMeetingPdf(file, viewCycle.id);
+                        event.target.value = "";
+                      }} />
+                    </label>}
+                    {pdfMessage?.cycleId === viewCycle?.id && <p className="meeting-pdf-status" role="status">{pdfMessage?.text}</p>}
+                  </section>
                 </div>
               </div>
 
