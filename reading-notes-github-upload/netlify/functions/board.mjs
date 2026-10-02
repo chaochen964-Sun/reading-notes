@@ -271,9 +271,71 @@ function ownsNote(note, profile) {
   );
 }
 
+const meetingBucket = "reading-meeting-pdfs";
+const maxMeetingPdfBytes = 10 * 1024 * 1024;
+
+async function storageFetch(path, options = {}) {
+  const { url, key: serviceKey } = supabaseConfig();
+  return fetch(`${url}/storage/v1/${path}`, {
+    ...options,
+    headers: { apikey: serviceKey, authorization: `Bearer ${serviceKey}`, ...options.headers },
+  });
+}
+
+async function meetingPdfAction(data) {
+  const deviceId = String(data.profile?.deviceId || "");
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(deviceId)) return json({ error: "请先设置阅读昵称。" }, 400);
+  let board = await loadBoard();
+  let cycle = board.cycles.find((item) => item.id === data.cycleId);
+  if (!cycle) return json({ error: "找不到对应期次，请刷新后重试。" }, 404);
+  if (data.action === "deleteMeetingPdf") {
+    const attachment = (cycle.meeting_pdfs || []).find((item) => item.id === data.attachmentId);
+    if (!attachment) return json({ error: "这份记录已经删除，请刷新页面。" }, 404);
+    if (attachment.device_id && attachment.device_id !== deviceId) return json({ error: "只有上传者可以删除这份记录。" }, 403);
+    // Retain a recovery copy; removed files are no longer available through the viewing endpoint.
+    cycle.deleted_meeting_pdfs = [...(cycle.deleted_meeting_pdfs || []), { ...attachment, deleted_at: now() }];
+    cycle.meeting_pdfs = cycle.meeting_pdfs.filter((item) => item.id !== attachment.id);
+    await saveBoard(board);
+    return json({ ok: true });
+  }
+  if ((cycle.meeting_pdfs || []).length) return json({ error: "本期已有一份 PDF，请先删除后再上传。" }, 409);
+  if (data.action === "prepareMeetingPdf") {
+    const name = String(data.name || "");
+    if (!/\.pdf$/i.test(name) || !Number.isInteger(data.size) || data.size < 5 || data.size > maxMeetingPdfBytes) return json({ error: "请选择不超过 10 MB 的 PDF 文件。" }, 400);
+    const pending = cycle.pending_meeting_pdf;
+    if (pending && pending.device_id !== deviceId && now() - pending.created_at < 15 * 60 * 1000) return json({ error: "本期有文件正在上传，请稍后重试。" }, 409);
+    const config = { id: meetingBucket, name: meetingBucket, public: false, file_size_limit: maxMeetingPdfBytes, allowed_mime_types: ["application/pdf"] };
+    const bucket = await storageFetch(`bucket/${meetingBucket}`);
+    const configured = await storageFetch(bucket.ok ? `bucket/${meetingBucket}` : "bucket", { method: bucket.ok ? "PUT" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(config) });
+    if (!configured.ok && configured.status !== 409) throw new Error("会议记录存储暂时不可用，请稍后重试。");
+    const attachment = { id: id(), name: name.replace(/[\u0000-\u001f\/\\]/g, "_").slice(0, 180), size: data.size, device_id: deviceId, created_at: now() };
+    attachment.path = `${attachment.id}.pdf`;
+    const signed = await storageFetch(`object/upload/sign/${meetingBucket}/${attachment.path}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    if (!signed.ok) throw new Error("暂时无法开始上传，请稍后重试。");
+    const result = await signed.json();
+    cycle.pending_meeting_pdf = attachment;
+    await saveBoard(board);
+    return json({ attachmentId: attachment.id, uploadUrl: `${supabaseConfig().url}/storage/v1${result.url}` });
+  }
+  const pending = cycle.pending_meeting_pdf;
+  if (!pending || pending.id !== data.attachmentId || pending.device_id !== deviceId) return json({ error: "上传已失效，请重新选择文件。" }, 409);
+  const stored = await storageFetch(`object/authenticated/${meetingBucket}/${pending.path}`);
+  if (!stored.ok) return json({ error: "文件尚未上传成功，请重新上传。" }, 400);
+  const bytes = new Uint8Array(await stored.arrayBuffer());
+  if (bytes.length !== pending.size || bytes.length > maxMeetingPdfBytes || new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") return json({ error: "文件大小或 PDF 格式不正确，请重新导出后上传。" }, 400);
+  board = await loadBoard();
+  cycle = board.cycles.find((item) => item.id === data.cycleId);
+  if (!cycle || (cycle.meeting_pdfs || []).length || cycle.pending_meeting_pdf?.id !== pending.id) return json({ error: "本期附件已变化，请刷新查看。" }, 409);
+  cycle.meeting_pdfs = [pending];
+  delete cycle.pending_meeting_pdf;
+  await saveBoard(board);
+  return json({ ok: true });
+}
+
 async function handlePost(req) {
-  const board = await loadBoard();
   const data = await req.json();
+  if (["prepareMeetingPdf", "completeMeetingPdf", "deleteMeetingPdf"].includes(data.action)) return meetingPdfAction(data);
+  const board = await loadBoard();
 
   if (data.action === "linkDevice") {
     const source = String(data.profile?.deviceId || "");
@@ -392,6 +454,14 @@ async function handleRequest(req) {
   if (req.method === "GET") {
     const board = await loadBoard();
     const params = new URL(req.url).searchParams;
+    if (params.has("meetingPdf")) {
+      const attachment = board.cycles.flatMap((cycle) => cycle.meeting_pdfs || []).find((item) => item.id === params.get("meetingPdf"));
+      if (!attachment) return json({ error: "找不到这份会议记录。" }, 404);
+      const signed = await storageFetch(`object/sign/${meetingBucket}/${encodeURIComponent(attachment.path)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ expiresIn: 3600 }) });
+      if (!signed.ok) return json({ error: "暂时无法打开 PDF，请稍后重试。" }, 502);
+      const result = await signed.json();
+      return new Response(null, { status: 302, headers: { location: `${supabaseConfig().url}/storage/v1${result.signedURL}`, "cache-control": "no-store" } });
+    }
     const deviceId = params.get("deviceId") || "";
     const name = params.get("name") || "";
     board.publicNotes = (board.notes || []).filter((note) => note.is_public === true).map((note) => ({ id: note.id, book_id: note.book_id, title: note.title, display_name: note.display_name, avatar: note.avatar, chapter: note.chapter, quote: note.quote, body: note.body, image_url: note.image_url, created_at: note.created_at }));
@@ -404,6 +474,7 @@ async function handleRequest(req) {
     }
     const visibleNoteIds = new Set([...board.groupNotes, ...board.publicNotes, ...board.notes].map((note) => note.id));
     board.replies = (board.replies || []).filter((reply) => visibleNoteIds.has(reply.note_id)).map((reply) => ({ id: reply.id, note_id: reply.note_id, display_name: reply.display_name, avatar: reply.avatar, body: reply.body, created_at: reply.created_at }));
+    board.cycles = board.cycles.map(({ pending_meeting_pdf, deleted_meeting_pdfs, ...cycle }) => cycle);
     return json(board);
   }
   if (req.method === "POST") return handlePost(req);
