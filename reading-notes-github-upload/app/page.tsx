@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, @next/next/no-img-element */
 
+import { sameBook, bookNotes } from "./book-details";
 import { useEffect, useMemo, useState } from "react";
 import { BookHeart, BookOpen, Bookmark, Check, ChevronRight, Library, LoaderCircle, MessageCircle, PenLine, Plus, Search, Settings, Sparkles, Trash2, Users, X } from "lucide-react";
 
@@ -152,7 +153,7 @@ export default function Home() {
   const [board, setBoard] = useState<Board>({ books: [], library: [], notes: [], publicNotes: [], replies: [], cycles: [], nominees: [], groupNotes: [] });
   const [tab, setTab] = useState<"mine" | "club" | "settings">("mine");
   const [filter, setFilter] = useState("reading");
-  const [modal, setModal] = useState<null | "book" | "note" | "nominate" | "groupNote" | "cycle" | "summary" | "bookDiscussion">(null);
+  const [modal, setModal] = useState<null | "book" | "note" | "nominate" | "groupNote" | "cycle" | "summary">(null);
   const [editingNomineeId, setEditingNomineeId] = useState<string | null>(null);
   const [editingNomineeCycleId, setEditingNomineeCycleId] = useState<string | null>(null);
   const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null);
@@ -166,7 +167,7 @@ export default function Home() {
   const [body, setBody] = useState("");
   const [noteImageUrl, setNoteImageUrl] = useState("");
   const [noteIsPublic, setNoteIsPublic] = useState(false);
-  const [discussionBook, setDiscussionBook] = useState<any>(null);
+  const [detailBookId, setDetailBookId] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [boardError, setBoardError] = useState("");
@@ -372,7 +373,6 @@ export default function Home() {
     setQuote("");
     setChapter("");
     setNoteImageUrl("");
-    setDiscussionBook(null);
   }
 
   function applyFallbackAction(payload: Record<string, unknown>) {
@@ -482,11 +482,33 @@ export default function Home() {
     return true;
   }
 
-  function sameBook(note: any, entry: any) {
-    if (note.book_id === entry.book_id) return true;
-    const noteBook = board.books.find((item) => item.id === note.book_id);
-    return Boolean(noteBook?.isbn && entry.isbn && !String(entry.isbn).startsWith("manual-") && noteBook.isbn === entry.isbn);
+  function bookHref(entry: any) {
+    return `#book=${encodeURIComponent(entry.book_id || entry.id)}`;
   }
+
+  useEffect(() => {
+    const readLocation = () => {
+      const id = new URLSearchParams(window.location.hash.slice(1)).get("book") || "";
+      setDetailBookId(id);
+      if (id) window.scrollTo(0, 0);
+    };
+    readLocation();
+    window.addEventListener("hashchange", readLocation);
+    return () => window.removeEventListener("hashchange", readLocation);
+  }, []);
+
+  function navigateTab(next: "mine" | "club" | "settings") {
+    setTab(next);
+    setDetailBookId("");
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    window.scrollTo(0, 0);
+  }
+
+  const detailBook = detailBookId ? board.library.find((x) => x.book_id === detailBookId)
+    || board.books.find((x) => x.id === detailBookId)
+    || board.nominees.find((x) => x.book_id === detailBookId) : null;
+  const detailLibrary = detailBook ? board.library.find((x) => sameBook(x, detailBook, board.books)) : null;
+  const detailNotes = detailBook ? bookNotes(board, detailBook) : [];
 
   function openNote(entry: any) {
     setSelectedEntry(entry);
@@ -672,7 +694,7 @@ export default function Home() {
     <main className="app-shell">
       <a className="skip-link" href="#reading-content">跳到阅读内容</a>
       <header className="topbar">
-        <button className="brand" onClick={() => setTab("mine")}>
+        <button className="brand" onClick={() => navigateTab("mine")}>
           <img src="/favicon.svg" alt="" />
           <span>
             <b>读记</b>
@@ -680,11 +702,11 @@ export default function Home() {
           </span>
         </button>
         <nav className="bottom-nav" aria-label="主导航">
-          <button aria-current={tab === "mine" ? "page" : undefined} className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}><BookOpen /><span>我的阅读</span></button>
-          <button aria-current={tab === "club" ? "page" : undefined} className={tab === "club" ? "active" : ""} onClick={() => setTab("club")}><Users /><span>共读现场</span></button>
-          <button aria-current={tab === "settings" ? "page" : undefined} className={tab === "settings" ? "active" : ""} onClick={() => setTab("settings")}><Settings /><span>设置</span></button>
+          <button aria-current={tab === "mine" ? "page" : undefined} className={tab === "mine" ? "active" : ""} onClick={() => navigateTab("mine")}><BookOpen /><span>我的阅读</span></button>
+          <button aria-current={tab === "club" ? "page" : undefined} className={tab === "club" ? "active" : ""} onClick={() => navigateTab("club")}><Users /><span>共读现场</span></button>
+          <button aria-current={tab === "settings" ? "page" : undefined} className={tab === "settings" ? "active" : ""} onClick={() => navigateTab("settings")}><Settings /><span>设置</span></button>
         </nav>
-        <button className="profile-chip" aria-label="打开读者设置" onClick={() => setTab("settings")}>
+        <button className="profile-chip" aria-label="打开读者设置" onClick={() => navigateTab("settings")}>
           <span>{profile?.avatar || "☁️"}</span>
           <div>
             <b>{profile?.name || "新读者"}</b>
@@ -695,7 +717,49 @@ export default function Home() {
 
       <div className="page-wrap" id="reading-content">
         {boardError && <p className="form-message">{boardError}</p>}
-        {tab === "mine" && (
+        {detailBookId && (
+          <section className="book-detail" aria-label="书籍详情">
+            {message && !modal && <p role="alert" className="form-message">{message}</p>}
+            <button className="text-button detail-back" onClick={() => navigateTab(tab)}>返回{tab === "club" ? "共读现场" : "我的阅读"}</button>
+            {detailBook ? <>
+              <div className="book-detail-header">
+                <Cover book={detailBook} />
+                <div className="book-detail-info">
+                  <h1>{detailBook.title}</h1>
+                  <p className="detail-author">{detailBook.authors || "作者待补"}</p>
+                  <dl className="book-facts">
+                    {detailBook.publisher && <div><dt>出版社</dt><dd>{detailBook.publisher}</dd></div>}
+                    {detailBook.published_date && <div><dt>出版日期</dt><dd>{detailBook.published_date}</dd></div>}
+                    {detailBook.isbn && !detailBook.isbn.startsWith("manual-") && <div><dt>ISBN</dt><dd>{detailBook.isbn}</dd></div>}
+                    {detailLibrary && <div><dt>我的阅读</dt><dd>{statusLabel[detailLibrary.status]}{detailLibrary.status === "reading" ? ` · ${detailLibrary.progress || 0}%` : ""}</dd></div>}
+                  </dl>
+                  {safeHttpUrl(detailBook.podcast_url) && <a className="text-button" href={safeHttpUrl(detailBook.podcast_url)} target="_blank" rel="noopener noreferrer">打开 Podcast</a>}
+                </div>
+              </div>
+              <div className="detail-actions">
+                <button className="primary" onClick={() => openNote(detailLibrary || { ...detailBook, book_id: detailBook.book_id || detailBook.id })}><PenLine size={18} />写笔记</button>
+                {detailLibrary ? <button className="outline" onClick={() => openLibraryEditor(detailLibrary)}>编辑我的书目</button> : <button className="outline" onClick={() => { openLibraryEditor(detailBook); setEditingLibraryId(null); setStatus("wish"); setProgress(0); }}>加入我的书架</button>}
+              </div>
+              <section className="book-detail-notes" aria-labelledby="book-notes-title">
+                <div className="section-title"><h2 id="book-notes-title">笔记与评论 <span>{detailNotes.length}</span></h2></div>
+                <p className="quiet">这本书的公开笔记与共读讨论。标注“仅自己可见”的笔记只有你能看到。</p>
+                {detailNotes.length ? detailNotes.map((note) => {
+                  const own = note.kind === "personal" || (note.kind === "group" && isMyNote(note));
+                  const shared = note.kind !== "personal" || note.is_public === true;
+                  return <div key={note.id} className="book-note-entry">
+                    <small className="detail-note-source">{note.kind === "group" ? `${cycles.find((c) => c.id === note.cycle_id)?.eyebrow || "共读"} · 共读笔记` : shared ? "公开笔记" : "仅自己可见"}</small>
+                    <NoteCard note={note} shared canEdit={own}
+                      replies={(board.replies || []).filter((reply) => reply.note_id === note.id)}
+                      onReply={shared ? (reply) => profile ? act({ action: "addReply", profile, noteId: note.id, body: reply }, true) : Promise.resolve(false) : undefined}
+                      onEdit={() => note.kind === "group" ? openGroupNoteEditor(note) : openPersonalNoteEditor(note)}
+                      onDelete={() => { if (profile && window.confirm("确定删除这则笔记吗？")) void act({ action: note.kind === "group" ? "deleteGroupNote" : "deletePersonalNote", profile, noteId: note.id }, true); }} />
+                  </div>;
+                }) : <div className="detail-empty"><h3>这本书还没有笔记</h3><p>写下第一段感想，或留一句想和书友讨论的话。</p><button className="text-button" onClick={() => openNote(detailLibrary || { ...detailBook, book_id: detailBook.book_id || detailBook.id })}>写第一则笔记 <ChevronRight size={16}/></button></div>}
+              </section>
+            </> : <p role="status" className="quiet">{board.books.length || board.nominees.length ? "没有找到这本书，请返回书架重新选择。" : "正在加载书籍信息…"}</p>}
+          </section>
+        )}
+        {!detailBookId && tab === "mine" && (
           <>
             <section className="page-heading">
               <div>
@@ -730,10 +794,10 @@ export default function Home() {
                   <div className="book-grid">
                     {visibleLibrary.map((entry) => (
                       <article className="book-card" key={entry.id}>
-                        <Cover book={entry} />
+                        <a className="book-cover-link" href={bookHref(entry)} aria-label={`查看《${entry.title}》`}><Cover book={entry} /></a>
                         <div className="book-copy">
                           <span className="book-status">{statusLabel[entry.status]}</span>
-                          <h3>{entry.title}</h3>
+                          <h3><a className="book-title-link" href={bookHref(entry)}>{entry.title}</a></h3>
                           <p>{entry.authors || "作者待补"}</p>
                           {entry.status === "reading" && (
                             <>
@@ -746,7 +810,7 @@ export default function Home() {
                           )}
                           <div className="button-row compact">
                             <button className="text-button" onClick={() => openNote(entry)}>写笔记 <ChevronRight size={16} /></button>
-                            <button className="text-button" onClick={() => { setDiscussionBook(entry); setModal("bookDiscussion"); }}>书友笔记</button>
+                            <a className="text-button" href={bookHref(entry)}>笔记与评论</a>
                             <button className="text-button" onClick={() => openLibraryEditor(entry)}>编辑书目</button>
                           </div>
                         </div>
@@ -783,7 +847,7 @@ export default function Home() {
           </>
         )}
 
-        {tab === "club" && (
+        {!detailBookId && tab === "club" && (
           <>
             <section className="club-hero">
               <div>
@@ -832,9 +896,9 @@ export default function Home() {
                 </div>
                 {selectedBook ? (
                   <div className="selected-book">
-                    <Cover book={selectedBook} />
+                    <a className="book-cover-link" href={bookHref(selectedBook)} aria-label={`查看《${selectedBook.title}》`}><Cover book={selectedBook} /></a>
                     <div>
-                      <h3>{selectedBook.title}</h3>
+                      <h3><a className="book-title-link" href={bookHref(selectedBook)}>{selectedBook.title}</a></h3>
                       <p>{selectedBook.authors || "作者待补"}</p>
                       <span>ISBN {selectedBook.isbn}</span>
                       <div className="podcast-slot">
@@ -891,9 +955,9 @@ export default function Home() {
                 <div className="nominee-list">
                   {viewNominees.map((n) => (
                     <div className="nominee" key={n.id}>
-                      <Cover book={n} />
+                      <a className="book-cover-link" href={bookHref(n)} aria-label={`查看《${n.title}》`}><Cover book={n} /></a>
                       <div>
-                        <b>{n.title}</b>
+                        <b><a className="book-title-link" href={bookHref(n)}>{n.title}</a></b>
                         <span>{n.authors || "作者待补"}</span>
                         {n.note && <small>{n.note}</small>}
                       </div>
@@ -950,9 +1014,9 @@ export default function Home() {
                         {items.length ? (
                           items.map((n) => (
                             <div className="history-nominee" key={`${cycle.id}-${n.id}`}>
-                              <Cover book={n} />
+                              <a className="book-cover-link" href={bookHref(n)} aria-label={`查看《${n.title}》`}><Cover book={n} /></a>
                               <div>
-                                <b>{n.title}</b>
+                                <b><a className="book-title-link" href={bookHref(n)}>{n.title}</a></b>
                                 <span>{n.authors || "作者待补"}</span>
                                 {n.note && <small>{n.note}</small>}
                               </div>
@@ -980,7 +1044,7 @@ export default function Home() {
           </>
         )}
 
-        {tab === "settings" && (
+        {!detailBookId && tab === "settings" && (
           <section className="settings-page">
             <h1>读者设置</h1>
             <div className="settings-card">
@@ -1085,16 +1149,6 @@ export default function Home() {
               message={message}
               existingBooks={modal === "book" && !editingLibraryId ? board.books : []}
             />
-          )}
-
-          {modal === "bookDiscussion" && discussionBook && (
-            <div className="book-discussion">
-              <p className="quiet">《{discussionBook.title}》的公开笔记与共读笔记。旧的个人笔记只有作者选择公开后才会出现。</p>
-              {(() => {
-                const notes = [...(board.publicNotes || []), ...board.groupNotes].filter((note) => sameBook(note, discussionBook)).sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0));
-                return notes.length ? notes.map((note) => <NoteCard key={note.id} note={note} shared replies={(board.replies || []).filter((reply) => reply.note_id === note.id)} onReply={(reply) => profile ? act({ action: "addReply", profile, noteId: note.id, body: reply }, true) : Promise.resolve(false)} />) : <p className="quiet">还没有公开笔记。你可以先写一则，并选择公开给书友。</p>;
-              })()}
-            </div>
           )}
 
           {modal === "book" && (
@@ -1278,7 +1332,6 @@ function modalTitle(x: string) {
     note: "写一则个人笔记",
     nominate: "推选一本书",
     groupNote: "写共读笔记",
-    bookDiscussion: "书友笔记",
     summary: "编辑讨论小结",
   } as Record<string, string>)[x];
 }

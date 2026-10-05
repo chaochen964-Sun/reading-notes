@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { sameBook, bookNotes } from '../app/book-details.ts';
+const entry = { id: 'b1', isbn: '9787111555377' };
+const books = [entry, {id:'duplicate',isbn:'978-7-111-55537-7'}];
+assert.equal(sameBook({book_id:'b1'},entry,books),true);
+assert.equal(sameBook({book_id:'duplicate'},entry,books),true);
+assert.equal(sameBook({}, {}, books),false);
+assert.equal(sameBook({isbn:'manual-a'},{isbn:'manual-a'},books),false);
+const board = {books, notes:[{id:'mine',book_id:'b1',created_at:2,is_public:true},{id:'private',book_id:'b1',created_at:3}], publicNotes:[{id:'mine',book_id:'b1',created_at:2},{id:'other',book_id:'duplicate',created_at:1},{id:'unrelated',book_id:'different'}],groupNotes:[{id:'group',book_id:'b1',created_at:4,cycle_id:'c1'}]};
+const result=bookNotes(board,entry);
+assert.deepEqual(result.map(x=>x.id),['group','private','mine','other']);
+assert.equal(result.find(x=>x.id==='mine').kind,'personal');
+assert.equal(result.find(x=>x.id==='group').kind,'group');
+assert.equal(board.publicNotes[0].kind,undefined);
+console.log('Passed: identity/ISBN matching, no missing-ID matches, deduplication, ownership and ordering.');
