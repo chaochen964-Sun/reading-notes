@@ -204,6 +204,9 @@ svg { flex-shrink: 0; }
 .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .button-row.compact { display: flex; flex-wrap: wrap; gap: 12px; margin-top: auto; }
 .note-actions { display: flex; flex-direction: row; gap: 14px; margin-top: 14px; }
+.note-actions .text-button { min-height: 44px; min-width: 44px; }
+.note-card blockquote, .note-card > p, .reply-item span { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+.copy-note-fallback { display: block; width: 100%; min-height: 150px; margin-top: 10px; font: inherit; }
 .note-visibility { display: block; margin-top: 12px; color: var(--muted); }
 .reply-thread { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
 .reply-item { display: grid; gap: 2px; margin: 0 0 12px; font-size: 14px; white-space: pre-wrap; }

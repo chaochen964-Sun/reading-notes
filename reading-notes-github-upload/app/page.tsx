@@ -1274,6 +1274,16 @@ function NoteCard({ note, shared = false, canEdit = false, replies = [], onReply
   const [reply, setReply] = useState("");
   const [replyError, setReplyError] = useState("");
   const [replying, setReplying] = useState(false);
+  const [copyStatus, setCopyStatus] = useState("");
+  async function copyNote() {
+    const text = [note.quote, note.body].filter(Boolean).join("\n\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyStatus("已复制文字");
+    } catch {
+      setCopyStatus("浏览器未允许复制，请在下方文本框长按复制。");
+    }
+  }
   async function sendReply() {
     if (!reply.trim() || !onReply) return;
     setReplying(true);
@@ -1295,12 +1305,15 @@ function NoteCard({ note, shared = false, canEdit = false, replies = [], onReply
       <p>{note.body}</p>
       {imageUrl && <img className="note-image" src={imageUrl} alt="笔记配图" loading="lazy" />}
       {canEdit && !shared && <small className="note-visibility">{note.is_public ? "已公开给书友" : "仅自己可见"}</small>}
-      {canEdit && (
-        <div className="note-actions">
+      <div className="note-actions">
+        <button className="text-button tiny" onClick={() => void copyNote()}>复制文字</button>
+        {canEdit && <>
           <button className="text-button tiny" onClick={onEdit}>编辑</button>
           <button className="text-button tiny danger-link" onClick={onDelete}>删除</button>
-        </div>
-      )}
+        </>}
+      </div>
+      {copyStatus && <small role="status">{copyStatus}</small>}
+      {copyStatus.startsWith("浏览器") && <textarea className="copy-note-fallback" aria-label="可复制的笔记文字" readOnly value={[note.quote, note.body].filter(Boolean).join("\n\n")} onFocus={(event) => event.target.select()} />}
       {(onReply || replies.length > 0) && (
         <div className="reply-thread">
           {replies.map((item) => <p className="reply-item" key={item.id}><b>{item.avatar} {item.display_name}</b><span>{item.body}</span></p>)}
