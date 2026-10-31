@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #f7f9fc; --white: #ffffff; --ink: #15274b; --muted: #59677f;
+  --paper: #f6f3ec; --white: #ffffff; --ink: #15274b; --muted: #59677f;
   --accent: #254cda; --blue: #dce8ff; --blue-2: #b5ceff; --line: #d2dbea;
   --serif: "Songti SC", "Noto Serif CJK SC", "Noto Serif SC", "STSong", serif;
   --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -318,3 +318,25 @@ svg { flex-shrink: 0; }
   .book-facts dd { margin-top: 3px; }
   .detail-actions { margin: 24px 0 32px; }
 }
+
+/* Ribbon bookmarks sit in the margins, away from text and touch targets. */
+.page-wrap { position: relative; }
+.page-wrap::before, .page-wrap::after {
+  content: ""; position: absolute; top: 0; width: 20px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 9px), 0 100%);
+  pointer-events: none;
+}
+.page-wrap::before { right: 44px; height: 30px; background: #bbc9df; }
+.page-wrap::after { right: 14px; height: 23px; background: #c9b696; }
+.journal-notes { position: relative; background: #e6ecf1; border-top: 1px solid #cbd5df; }
+.journal-notes::before {
+  content: ""; position: absolute; top: -1px; right: 27px; width: 18px; height: 23px;
+  background: #466b96;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 17px, 0 100%);
+  pointer-events: none;
+}
+@media (max-width: 820px) {
+  .page-wrap::before { right: 31px; width: 14px; height: 21px; }
+  .page-wrap::after { right: 9px; width: 14px; height: 16px; }
+}
+@media (max-width: 620px) { .bottom-nav { background: var(--paper); } }
