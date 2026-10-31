@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, @next/next/no-img-element */
 
+import { BookmarkRain } from "./bookmark-rain";
 import { sameBook, bookNotes } from "./book-details";
 import { useEffect, useMemo, useState } from "react";
 import { BookHeart, BookOpen, Bookmark, Check, ChevronRight, Library, LoaderCircle, MessageCircle, PenLine, Plus, Search, Settings, Sparkles, Trash2, Users, X } from "lucide-react";
@@ -692,6 +693,7 @@ export default function Home() {
 
   return (
     <main className="app-shell">
+      <BookmarkRain />
       <a className="skip-link" href="#reading-content">跳到阅读内容</a>
       <header className="topbar">
         <button className="brand" onClick={() => navigateTab("mine")}>
